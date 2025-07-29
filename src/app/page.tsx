@@ -1,5 +1,5 @@
-import { DashboardFeature } from '@/components/dashboard/dashboard-feature'
+import MeteoraFeature from '@/components/meteora/meteora-feature'
 
 export default function Home() {
-  return <DashboardFeature />
+  return <MeteoraFeature />
 }
