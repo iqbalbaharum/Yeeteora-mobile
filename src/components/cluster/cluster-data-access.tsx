@@ -19,16 +19,29 @@ export enum ClusterNetwork {
   Custom = 'custom',
 }
 
-// By default, we don't configure the mainnet-beta cluster
-// The endpoint provided by clusterApiUrl('mainnet-beta') does not allow access from the browser due to CORS restrictions
-// To use the mainnet-beta cluster, provide a custom endpoint
+// Updated clusters with Alchemy mainnet as primary
 export const defaultClusters: SolanaCluster[] = [
+  {
+    name: 'alchemy-mainnet',
+    endpoint: process.env.NEXT_PUBLIC_ALCHEMY_SOLANA_API_KEY 
+      ? `https://solana-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_SOLANA_API_KEY}`
+      : 'https://api.mainnet-beta.solana.com', // Fallback to public RPC if no API key
+    network: ClusterNetwork.Mainnet,
+  },
+  {
+    name: 'mainnet-beta',
+    endpoint: 'https://api.mainnet-beta.solana.com',
+    network: ClusterNetwork.Mainnet,
+  },
   {
     name: 'devnet',
     endpoint: clusterApiUrl('devnet'),
     network: ClusterNetwork.Devnet,
   },
-  { name: 'local', endpoint: 'http://localhost:8899' },
+  { 
+    name: 'local', 
+    endpoint: 'http://localhost:8899' 
+  },
   {
     name: 'testnet',
     endpoint: clusterApiUrl('testnet'),
@@ -36,7 +49,7 @@ export const defaultClusters: SolanaCluster[] = [
   },
 ]
 
-const clusterAtom = atomWithStorage<SolanaCluster>('solana-cluster', defaultClusters[0])
+const clusterAtom = atomWithStorage<SolanaCluster>('solana-cluster', defaultClusters[0]) // Default to Alchemy mainnet
 const clustersAtom = atomWithStorage<SolanaCluster[]>('solana-clusters', defaultClusters)
 
 const activeClustersAtom = atom<SolanaCluster[]>((get) => {
