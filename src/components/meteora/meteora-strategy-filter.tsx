@@ -90,12 +90,16 @@ function useMeteoraData() {
   })
 }
 
-// Filter functions
+// Filter functions - specific strategies with their own criteria
 const filterStrategies = {
-  all: (pairs: DLMMPair[]): DLMMPair[] => pairs,
-  
   oneSided: (pairs: DLMMPair[]): DLMMPair[] => {
+    const SOL_MINT = 'So11111111111111111111111111111111111111112'
+    
     return pairs.filter(pair => {
+      // Must be a SOL pair
+      const isSOLPair = pair.mint_x === SOL_MINT || pair.mint_y === SOL_MINT
+      if (!isSOLPair) return false
+      
       // Skip pairs with missing essential data or blacklisted pairs
       if (!pair.liquidity || !pair.trade_volume_24h || pair.is_blacklisted || pair.hide) return false
       
@@ -114,10 +118,26 @@ const filterStrategies = {
         volume6h > 400_000 // > $400k 6h volume
       )
     })
-  }
+  },
+  
+  // Add future strategies here...
+  // futureStrategy: (pairs: DLMMPair[]): DLMMPair[] => { ... }
 }
 
-type FilterStrategy = keyof typeof filterStrategies
+// Get all pairs that match ANY strategy
+const getAllStrategyPairs = (pairs: DLMMPair[]): DLMMPair[] => {
+  const allStrategyPairs = new Set<DLMMPair>()
+  
+  // Collect pairs from all individual strategies
+  Object.values(filterStrategies).forEach(strategyFilter => {
+    const strategyPairs = strategyFilter(pairs)
+    strategyPairs.forEach(pair => allStrategyPairs.add(pair))
+  })
+  
+  return Array.from(allStrategyPairs)
+}
+
+type FilterStrategy = keyof typeof filterStrategies | 'all'
 
 export function MeteoraStrategyFilter() {
   const [activeFilter, setActiveFilter] = useState<FilterStrategy>('all')
@@ -133,7 +153,9 @@ export function MeteoraStrategyFilter() {
   const allPairs = meteoraData?.groups.flatMap(group => group.pairs) || []
   
   // Apply selected filter
-  const filteredPairs = filterStrategies[activeFilter](allPairs)
+  const filteredPairs = activeFilter === 'all' 
+    ? getAllStrategyPairs(allPairs)
+    : filterStrategies[activeFilter](allPairs)
 
   const formatNumber = (num?: number) => {
     if (!num || num === 0) return 'N/A'
@@ -183,7 +205,7 @@ export function MeteoraStrategyFilter() {
             className="gap-2"
           >
             <Activity className="h-4 w-4" />
-            All Strategy
+            All Strategies
           </Button>
           
           <Button
@@ -213,13 +235,26 @@ export function MeteoraStrategyFilter() {
         </div>
       </div>
 
-      {/* One Sided Strategy Requirements Info */}
+      {/* Strategy Requirements Info */}
+      {activeFilter === 'all' && (
+        <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+          <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+            All Strategies Combined:
+          </h3>
+          <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1">
+            <li>• <strong>One Sided Strategy:</strong> SOL pairs with market cap &gt; $1M, 24h volume &gt; $2M, 6h volume &gt; $400K</li>
+            <li>• <strong>Future Strategies:</strong> Additional strategies will be automatically included here</li>
+          </ul>
+        </div>
+      )}
+
       {activeFilter === 'oneSided' && (
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
             One Sided Strategy Requirements:
           </h3>
           <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+            <li>• Must contain SOL as one of the tokens</li>
             <li>• Market cap: &gt; $1,000,000 USD</li>
             <li>• 24h volume: &gt; $2,000,000 USD</li>
             <li>• 6h volume: &gt; $400,000 USD</li>
@@ -251,9 +286,11 @@ export function MeteoraStrategyFilter() {
               {filteredPairs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {activeFilter === 'oneSided' 
-                      ? 'No pairs meet the one-sided strategy requirements'
-                      : 'No pairs found'
+                    {activeFilter === 'all'
+                      ? 'No pairs meet any strategy requirements'
+                      : activeFilter === 'oneSided' 
+                        ? 'No pairs meet the one-sided strategy requirements'
+                        : 'No pairs found for this strategy'
                     }
                   </TableCell>
                 </TableRow>

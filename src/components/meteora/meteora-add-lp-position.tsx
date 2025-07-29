@@ -26,13 +26,53 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [solAmount, setSolAmount] = useState('')
-  const [rangeMultiplier, setRangeMultiplier] = useState('1')
   const [error, setError] = useState('')
   const [txSignature, setTxSignature] = useState('')
 
   // Check if this is a SOL pair (SOL as one of the tokens)
   if (!isSOLPair) {
     return null // Only show for SOL pairs
+  }
+
+  // Polling-based confirmation method
+  const confirmTransactionWithPolling = async (signature: string, maxRetries = 30): Promise<boolean> => {
+    console.log('Starting transaction confirmation with polling...')
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true })
+        
+        console.log(`Attempt ${attempt + 1}: Transaction status:`, status.value)
+        
+        if (status.value?.confirmationStatus === 'confirmed' || status.value?.confirmationStatus === 'finalized') {
+          if (status.value.err) {
+            throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`)
+          }
+          console.log('Transaction confirmed successfully!')
+          return true
+        }
+        
+        if (status.value?.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`)
+        }
+        
+        // Wait 2 seconds before next attempt
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+      } catch (error) {
+        console.warn(`Confirmation attempt ${attempt + 1} failed:`, error)
+        
+        // If it's the last attempt, throw the error
+        if (attempt === maxRetries - 1) {
+          throw error
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+    
+    throw new Error('Transaction confirmation timeout after 60 seconds')
   }
 
   const handleAddPosition = async () => {
@@ -73,12 +113,12 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
       
       console.log('SOL token detected:', isTokenXSOL ? 'Token X' : 'Token Y')
       
-      // Calculate range for one-sided position
-      const RANGE_MULTIPLIER = parseInt(rangeMultiplier) || 1
+      // Calculate range for one-sided position - always use 69 bins
+      const NUM_BINS = 69
       const minBinId = activeBin.binId
-      const maxBinId = activeBin.binId + (10 * RANGE_MULTIPLIER) // Extend range upward for SOL
+      const maxBinId = activeBin.binId + NUM_BINS
       
-      console.log('Position range:', { minBinId, maxBinId })
+      console.log('Position range: 69 bins from', { minBinId, maxBinId })
       
       // Convert SOL amount to lamports
       const solInLamports = new BN(parseFloat(solAmount) * LAMPORTS_PER_SOL)
@@ -128,48 +168,18 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
       console.log('Transaction sent:', signature)
       setTxSignature(signature)
       
-      // Try to confirm transaction with better error handling
-      try {
-        console.log('Waiting for confirmation...')
-        const latestBlockhash = await connection.getLatestBlockhash('confirmed')
-        
-        // Use a more robust confirmation method
-        const confirmation = await connection.confirmTransaction({
-          signature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-        }, 'confirmed')
-        
-        if (confirmation.value.err) {
-          throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`)
-        }
-        
-        console.log('Transaction confirmed successfully!')
-        
-      } catch (confirmError) {
-        console.warn('Confirmation failed, but transaction may still be successful:', confirmError)
-        
-        // Try to check transaction status manually
-        try {
-          const txStatus = await connection.getSignatureStatus(signature)
-          console.log('Transaction status:', txStatus)
-          
-          if (txStatus.value?.confirmationStatus === 'confirmed' || txStatus.value?.confirmationStatus === 'finalized') {
-            console.log('Transaction is actually confirmed!')
-          }
-        } catch (statusError) {
-          console.warn('Could not check transaction status:', statusError)
-        }
-      }
+      // Use polling-based confirmation instead of WebSocket subscription
+      console.log('Confirming transaction with polling method...')
+      await confirmTransactionWithPolling(signature)
+      
       console.log('Position address:', newPosition.publicKey.toString())
       
       // Close modal on success
       setIsOpen(false)
       setSolAmount('')
-      setRangeMultiplier('1')
       
       // Show success message
-      alert(`LP Position Created Successfully!\n\nTransaction: ${signature}\nPosition: ${newPosition.publicKey.toString()}\n\nNote: If confirmation failed, check the transaction on Solana Explorer. The position may still be created successfully.`)
+      alert(`LP Position Created Successfully!\n\nTransaction: ${signature}\nPosition: ${newPosition.publicKey.toString()}`)
       
     } catch (err: any) {
       console.error('Error creating LP position:', err)
@@ -224,19 +234,12 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="range">Price Range Multiplier</Label>
-            <Input
-              id="range"
-              type="number"
-              placeholder="1"
-              value={rangeMultiplier}
-              onChange={(e) => setRangeMultiplier(e.target.value)}
-              min="1"
-              max="3"
-              step="1"
-            />
+            <Label htmlFor="range">Price Range</Label>
+            <div className="p-2 bg-muted rounded-md text-sm">
+              Fixed at 69 bins for optimal liquidity concentration
+            </div>
             <p className="text-xs text-muted-foreground">
-              BidAsk strategy works best with smaller ranges (1-3x). Higher concentration = more fees.
+              Using 69 bins provides the perfect balance between concentration and range coverage.
             </p>
           </div>
           
@@ -266,7 +269,7 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
           
           <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
             <p className="text-sm text-green-800 dark:text-green-200">
-              <strong>Why BidAsk for One-Sided?</strong> BidAsk strategy concentrates liquidity asymmetrically, making it ideal for SOL-only deposits as it provides deeper liquidity where traders need it most.
+              <strong>69 Bins Strategy:</strong> Using exactly 69 bins provides optimal liquidity concentration for BidAsk positions, balancing fee capture efficiency with adequate price range coverage.
             </p>
           </div>
           
