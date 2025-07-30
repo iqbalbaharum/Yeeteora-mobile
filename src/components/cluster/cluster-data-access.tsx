@@ -21,6 +21,11 @@ export enum ClusterNetwork {
 
 // Updated clusters with Alchemy mainnet as primary
 export const defaultClusters: SolanaCluster[] = [
+   {
+    name: 'custom-mainnet',
+    endpoint: process.env.NEXT_PUBLIC_Custom_RPC_URL || 'https://api.mainnet-beta.solana.com',
+    network: ClusterNetwork.Mainnet,
+  },
   {
     name: 'alchemy-mainnet',
     endpoint: process.env.NEXT_PUBLIC_ALCHEMY_SOLANA_API_KEY 
