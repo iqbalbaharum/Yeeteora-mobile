@@ -16,10 +16,10 @@ export function AppLayout({
   links: { label: string; path: string }[]
 }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <div className="flex flex-col min-h-screen">
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+      <div className="flex flex-col min-h-screen gradient-bg">
         <AppHeader links={links} />
-        <main className="flex-grow container mx-auto p-4">
+        <main className="flex-grow px-4 pb-4">
           <ClusterChecker>
             <AccountChecker />
           </ClusterChecker>

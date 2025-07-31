@@ -3,13 +3,13 @@ import { MeteoraStrategyFilter } from '@/components/meteora/meteora-strategy-fil
 
 export default function MeteoraFeature() {
   return (
-    <div>
+    <div className="min-h-screen">
       <AppHero
-        title="Meteora DLMM Strategies"
-        subtitle="Discover and filter Meteora DLMM pairs by strategy requirements"
+        title="LP Strategies"
+        subtitle="Discover and provide liquidity for high-performing DLMM pairs"
       />
-      
-      <div className="max-w-7xl mx-auto">
+
+      <div className="relative z-10">
         <MeteoraStrategyFilter />
       </div>
     </div>
