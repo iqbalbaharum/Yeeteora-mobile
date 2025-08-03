@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { PublicKey, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Plus, AlertCircle, TrendingUp, Coins, Settings, Info, ExternalLink, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, AlertCircle, TrendingUp, Coins, Settings, Info, ExternalLink, CheckCircle, ChevronDown, ChevronUp, Percent } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useGetBalance } from '../account/account-data-access'
 
 // Import Meteora DLMM SDK
 import DLMM, { StrategyType } from '@meteora-ag/dlmm'
@@ -30,6 +31,21 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
   const [txSignature, setTxSignature] = useState('')
   const [showStrategyInfo, setShowStrategyInfo] = useState(false)
   const [showNotesInfo, setShowNotesInfo] = useState(false)
+
+  // Get wallet balance
+  const balanceQuery = useGetBalance({ address: publicKey || new PublicKey('11111111111111111111111111111111') })
+  const walletBalanceSOL = balanceQuery.data && publicKey ? balanceQuery.data / LAMPORTS_PER_SOL : 0
+
+  // Function to set percentage of wallet balance
+  const setPercentageAmount = (percentage: number) => {
+    if (walletBalanceSOL > 0) {
+      const amount = (walletBalanceSOL * percentage / 100)
+      // Keep some SOL for transaction fees (at least 0.01 SOL)
+      const maxUsable = Math.max(0, walletBalanceSOL - 0.01)
+      const finalAmount = Math.min(amount, maxUsable)
+      setSolAmount(Math.max(0, finalAmount).toFixed(3))
+    }
+  }
 
   // Check if this is a SOL pair (SOL as one of the tokens)
   if (!isSOLPair) {
@@ -250,10 +266,18 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
 
             {/* SOL Amount */}
             <div className="space-y-3">
-              <Label htmlFor="solAmount" className="text-sm font-medium flex items-center gap-2">
-                <Coins className="w-4 h-4 text-primary" />
-                SOL Amount
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="solAmount" className="text-sm font-medium flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-primary" />
+                  SOL Amount
+                </Label>
+                {publicKey && balanceQuery.data && (
+                  <span className="text-xs text-muted-foreground">
+                    Balance: {walletBalanceSOL.toFixed(3)} SOL
+                  </span>
+                )}
+              </div>
+
               <Input
                 id="solAmount"
                 type="number"
@@ -262,9 +286,34 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
                 onChange={(e) => setSolAmount(e.target.value)}
                 min="0.02"
                 step="0.01"
-                className="text-lg py-3 px-4"
+                className="text-sm py-3 px-4"
               />
-              <p className="text-xs text-muted-foreground">Minimum: 0.02 SOL</p>
+
+              {/* Percentage Buttons */}
+              {publicKey && walletBalanceSOL > 0.02 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {[25, 50, 75, 100].map((percentage) => {
+                    const amount = (walletBalanceSOL * percentage / 100)
+                    const maxUsable = Math.max(0, walletBalanceSOL - 0.01)
+                    const finalAmount = Math.min(amount, maxUsable)
+
+                    return (
+                      <Button
+                        key={percentage}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPercentageAmount(percentage)}
+                        disabled={finalAmount < 0.02}
+                        className="text-xs h-8 glass-effect border-border/20 hover:border-primary/30"
+                      >
+                        <Percent className="w-3 h-3 mr-1" />
+                        {percentage}%
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
+
             </div>
 
             {/* Price Range */}
@@ -308,7 +357,7 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">Important Notes</span>
+                <span className="text-sm font-medium">Notes</span>
               </div>
               <Button
                 variant="ghost"
@@ -321,9 +370,9 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             </div>
             {showNotesInfo && (
               <div className="mt-4 space-y-3 text-xs text-muted-foreground">
-                <p>• Position rent (~0.057 SOL) is fully refundable when closed</p>
-                <p>• 69 bins provides optimal concentration for maximum efficiency</p>
-                <p>• BidAsk strategy focuses liquidity around current price</p>
+                <p>- Position rent (~0.057 SOL) is fully refundable when closed</p>
+                <p>- 69 bins provides optimal concentration for maximum efficiency</p>
+                <p>- BidAsk strategy focuses liquidity around current price</p>
               </div>
             )}
           </div>

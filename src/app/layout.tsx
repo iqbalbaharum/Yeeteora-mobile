@@ -26,6 +26,7 @@ export const viewport: Viewport = {
 const links: { label: string; path: string }[] = [
   // More links...
   { label: 'Home', path: '/' },
+  { label: 'Meteora', path: '/meteora' },
   { label: 'Account', path: '/account' },
 ]
 

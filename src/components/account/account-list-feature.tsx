@@ -13,9 +13,18 @@ export default function AccountListFeature() {
   }
 
   return (
-    <div className="hero py-[64px]">
-      <div className="hero-content text-center">
-        <WalletButton />
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="text-center space-y-6 max-w-md w-full">
+        <div className="glass-effect rounded-2xl p-8 border border-border/20">
+          <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-2xl font-bold">W</span>
+          </div>
+          <h1 className="text-2xl font-bold mb-3">Connect Your Wallet</h1>
+          <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
+            Connect your Solana wallet to view your account details, token balances, and transaction history.
+          </p>
+          <WalletButton />
+        </div>
       </div>
     </div>
   )

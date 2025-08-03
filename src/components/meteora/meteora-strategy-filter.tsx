@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, TrendingUp, Activity, ChevronDown, ChevronUp, ExternalLink, Award, Zap } from 'lucide-react'
+import { YeetModal } from './yeet-modal'
 import { useQuery } from '@tanstack/react-query'
 import { AddLPPosition } from './meteora-add-lp-position'
 
@@ -183,7 +184,17 @@ function LPPairCard({ pair, rank }: { pair: DLMMPair; rank: number }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {rank <= 10 && <Zap className="w-4 h-4 text-primary" />}
+          {rank <= 10 && (
+            <YeetModal pairName={pair.name}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-1 text-primary hover:text-primary/80 hover:bg-primary/10 rounded-full transition-all duration-200"
+              >
+                <Zap className="w-4 h-4" />
+              </Button>
+            </YeetModal>
+          )}
           <Button
             variant="ghost"
             size="sm"

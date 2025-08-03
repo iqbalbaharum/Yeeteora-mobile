@@ -22,9 +22,9 @@ export function AppModal({
       </DialogTrigger>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="text-foreground">{title}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">{children}</div>
+        <div className="grid gap-4 py-4 text-foreground">{children}</div>
         <DialogFooter>
           {submit ? (
             <Button type="submit" onClick={submit} disabled={submitDisabled}>

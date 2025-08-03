@@ -1,7 +1,6 @@
 'use client'
-import { usePathname } from 'next/navigation'
-import { Home, Trophy, Wallet } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { Home, Trophy, Wallet, TrendingUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface NavbarProps {
@@ -26,6 +25,10 @@ export function AppNavbar({ links }: NavbarProps) {
         switch (label) {
             case 'Home':
                 return <Home className="w-5 h-5" />
+            case 'Meteora':
+                return <TrendingUp className="w-5 h-5" />
+            case 'Account':
+                return <Wallet className="w-5 h-5" />
             case 'Ranking':
                 return <Trophy className="w-5 h-5" />
             case 'Portfolio':
