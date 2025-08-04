@@ -131,12 +131,29 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
 
       console.log('SOL token detected:', isTokenXSOL ? 'Token X' : 'Token Y')
 
-      // Calculate range for one-sided position - always use 69 bins
+      // FIXED: Calculate range for one-sided BidAsk position - exactly 69 bins
       const NUM_BINS = 69
-      const minBinId = activeBin.binId
-      const maxBinId = activeBin.binId + NUM_BINS
+      let minBinId: number
+      let maxBinId: number
 
-      console.log('Position range: 69 bins from', { minBinId, maxBinId })
+      if (isTokenXSOL) {
+        // SOL is Token X - place bins ABOVE current price for one-sided position
+        // This creates a "bid" side where SOL is only used when price goes up
+        minBinId = activeBin.binId + 1  // Start 1 bin above current price
+        maxBinId = minBinId + (NUM_BINS - 1)  // Exactly 69 bins total
+      } else {
+        // SOL is Token Y - place bins BELOW current price for one-sided position
+        // This creates an "ask" side where SOL is only used when price goes down
+        maxBinId = activeBin.binId - 1  // End 1 bin below current price
+        minBinId = maxBinId - (NUM_BINS - 1)  // Exactly 69 bins total
+      }
+
+      console.log('One-sided BidAsk position range:', { 
+        minBinId, 
+        maxBinId, 
+        activeBinId: activeBin.binId,
+        totalBins: maxBinId - minBinId + 1 
+      })
 
       // Convert SOL amount to lamports
       const solInLamports = new BN(parseFloat(solAmount) * LAMPORTS_PER_SOL)
@@ -146,24 +163,26 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
       let totalYAmount: BN
 
       if (isTokenXSOL) {
-        totalXAmount = solInLamports
-        totalYAmount = new BN(0) // No other token
+        totalXAmount = solInLamports  // All SOL goes to X
+        totalYAmount = new BN(0)      // No Y token
       } else {
-        totalXAmount = new BN(0) // No other token  
-        totalYAmount = solInLamports
+        totalXAmount = new BN(0)      // No X token
+        totalYAmount = solInLamports  // All SOL goes to Y
       }
 
       console.log('Position amounts:', {
         totalXAmount: totalXAmount.toString(),
-        totalYAmount: totalYAmount.toString()
+        totalYAmount: totalYAmount.toString(),
+        isTokenXSOL,
+        strategy: 'BidAsk one-sided'
       })
 
       // Generate new position keypair
       const newPosition = new Keypair()
       console.log('New position address:', newPosition.publicKey.toString())
 
-      // Create one-sided liquidity position with BidAsk strategy
-      console.log('Creating position transaction...')
+      // Create one-sided liquidity position with BidAsk strategy and FIXED bin range
+      console.log('Creating BidAsk position transaction...')
       const createPositionTx = await dlmmPool.initializePositionAndAddLiquidityByStrategy({
         positionPubKey: newPosition.publicKey,
         user: publicKey,
@@ -172,7 +191,7 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
         strategy: {
           maxBinId,
           minBinId,
-          strategyType: StrategyType.BidAsk, // Use BidAsk for better one-sided concentration
+          strategyType: StrategyType.BidAsk, // Keep BidAsk for asymmetric one-sided distribution
         },
       })
 
@@ -197,7 +216,7 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
       setSolAmount('')
 
       // Show success message
-      alert(`LP Position Created Successfully!\n\nTransaction: ${signature}\nPosition: ${newPosition.publicKey.toString()}`)
+      alert(`One-Sided BidAsk LP Position Created Successfully!\n\nTransaction: ${signature}\nPosition: ${newPosition.publicKey.toString()}\nBins: ${maxBinId - minBinId + 1} (${minBinId}-${maxBinId})`)
 
     } catch (err: any) {
       console.error('Error creating LP position:', err)
@@ -222,10 +241,10 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-white" />
             </div>
-            Add LP Position
+            Add One-Sided LP Position
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Create a new liquidity position using the BidAsk strategy for optimal fee capture.
+            Create a one-sided liquidity position using BidAsk strategy for directional exposure.
           </DialogDescription>
         </DialogHeader>
 
@@ -235,7 +254,7 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-primary">BidAsk Strategy</h3>
+                <h3 className="font-semibold text-primary">One-Sided BidAsk</h3>
               </div>
               <Button
                 variant="ghost"
@@ -248,7 +267,8 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             </div>
             {showStrategyInfo && (
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Concentrates your SOL liquidity efficiently around the current price for higher fee capture when traders swap.
+                Places your SOL liquidity strategically above or below current price for directional trading. 
+                Your SOL will only be active when the market moves in your favor.
               </p>
             )}
           </div>
@@ -320,9 +340,12 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             <div className="gradient-card border border-border rounded-xl p-5">
               <div className="flex items-center gap-3 mb-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-muted-foreground">Price Range</span>
+                <span className="text-sm font-medium text-muted-foreground">Strategy</span>
               </div>
-              <p className="font-medium">Fixed at 69 bins</p>
+              <p className="font-medium">69 bins (one-sided BidAsk)</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Positioned for directional exposure
+              </p>
             </div>
           </div>
 
@@ -371,8 +394,9 @@ export function AddLPPosition({ pairAddress, pairName, isSOLPair }: AddLPPositio
             {showNotesInfo && (
               <div className="mt-4 space-y-3 text-xs text-muted-foreground">
                 <p>- Position rent (~0.057 SOL) is fully refundable when closed</p>
-                <p>- 69 bins provides optimal concentration for maximum efficiency</p>
-                <p>- BidAsk strategy focuses liquidity around current price</p>
+                <p>- 69 bins positioned strategically for one-sided exposure</p>
+                <p>- BidAsk strategy places liquidity above/below current price</p>
+                <p>- Your SOL will only trade when market moves in your direction</p>
               </div>
             )}
           </div>
