@@ -2,7 +2,7 @@
 'use client'
 
 import { PublicKey } from '@solana/web3.js'
-import { RefreshCw, TrendingUp, X, AlertTriangle } from 'lucide-react'
+import { RefreshCw, TrendingUp, X, AlertTriangle, Info, Eye, Copy, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -53,57 +53,10 @@ export function LPPositions({ address }: LPPositionsProps) {
           <p className="mt-2 text-muted-foreground">Loading LP positions...</p>
         </div>
       ) : query.data && query.data.length > 0 ? (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Position</TableHead>
-                <TableHead>Pair</TableHead>
-                <TableHead className="text-right">Bin Range</TableHead>
-                <TableHead className="text-right">X Amount</TableHead>
-                <TableHead className="text-right">Y Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {query.data.map((position: LPPosition) => (
-                <TableRow key={position.address}>
-                  <TableCell>
-                    <div className="font-mono text-sm">
-                      <ExplorerLink
-                        path={`account/${position.address}`}
-                        label={ellipsify(position.address, 6)}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{position.pairName}</div>
-                    <div className="text-sm text-muted-foreground font-mono">
-                      <ExplorerLink
-                        path={`account/${position.pairAddress}`}
-                        label={ellipsify(position.pairAddress, 4)}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {position.lowerBinId} - {position.upperBinId}
-                    <div className="text-xs text-muted-foreground">
-                      ({position.upperBinId - position.lowerBinId + 1} bins)
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatTokenAmount(position.totalXAmount)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatTokenAmount(position.totalYAmount)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ClosePositionDialog position={position} userAddress={address} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-4">
+          {query.data.map((position: LPPosition) => (
+            <PositionCard key={position.address} position={position} userAddress={address} />
+          ))}
         </div>
       ) : (
         <div className="text-center py-12 border rounded-lg border-dashed">
@@ -118,12 +71,164 @@ export function LPPositions({ address }: LPPositionsProps) {
   )
 }
 
-interface ClosePositionDialogProps {
-  position: LPPosition
-  userAddress: PublicKey
+// Position Card Component
+function PositionCard({ position, userAddress }: { position: LPPosition; userAddress: PublicKey }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  return (
+    <div className="glass-effect rounded-xl border border-border/20 overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">LP</span>
+            </div>
+            <div>
+              <p className="font-semibold">{position.pairName}</p>
+              <p className="text-xs text-muted-foreground font-mono">
+                {ellipsify(position.address, 6)}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-muted-foreground hover:text-primary"
+          >
+            <Info className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          </Button>
+        </div>
+
+        {/* Basic Position Info */}
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div className="text-center p-3 rounded-lg bg-background/50">
+            <p className="text-xs text-muted-foreground mb-1">Bin Range</p>
+            <p className="text-sm font-bold">
+              {position.lowerBinId} - {position.upperBinId}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ({position.upperBinId - position.lowerBinId + 1} bins)
+            </p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-background/50">
+            <p className="text-xs text-muted-foreground mb-1">Liquidity</p>
+            <p className="text-sm font-bold">
+              {formatTokenAmount(position.totalXAmount)} X
+            </p>
+            <p className="text-sm font-bold">
+              {formatTokenAmount(position.totalYAmount)} Y
+            </p>
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div className="border-t border-border/30 pt-3 mt-3 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Position Address</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs">{ellipsify(position.address, 8)}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigator.clipboard.writeText(position.address)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => window.open(`https://explorer.solana.com/account/${position.address}`, '_blank')}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Pair Address</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs">{ellipsify(position.pairAddress, 8)}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigator.clipboard.writeText(position.pairAddress)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => window.open(`https://explorer.solana.com/account/${position.pairAddress}`, '_blank')}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Token X Amount</p>
+                <p className="font-mono text-sm">{formatTokenAmount(position.totalXAmount)}</p>
+              </div>
+              
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Token Y Amount</p>
+                <p className="font-mono text-sm">{formatTokenAmount(position.totalYAmount)}</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Last Updated</p>
+                <p className="text-xs font-mono">
+                  {new Date(parseInt(position.lastUpdatedAt) * 1000).toLocaleString()}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Current Price</p>
+                <p className="text-xs font-mono">
+                  {position.pair?.current_price ? `$${position.pair.current_price.toFixed(6)}` : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {/* Bin Data */}
+            {position.binData && position.binData.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Active Bins ({position.binData.length})</p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {position.binData.slice(0, 5).map((bin, idx) => (
+                    <div key={bin.binId} className="flex justify-between text-xs bg-background/30 rounded p-2">
+                      <span>Bin {bin.binId}</span>
+                      <span>X: {formatTokenAmount(bin.xAmount)}, Y: {formatTokenAmount(bin.yAmount)}</span>
+                    </div>
+                  ))}
+                  {position.binData.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      ... and {position.binData.length - 5} more bins
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-4 border-t border-border/30">
+          <ClosePositionDialog position={position} userAddress={userAddress} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function ClosePositionDialog({ position, userAddress }: ClosePositionDialogProps) {
+// Close Position Dialog Component
+function ClosePositionDialog({ position, userAddress }: { position: LPPosition; userAddress: PublicKey }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const closeMutation = useCloseLPPosition({ address: userAddress })
@@ -147,9 +252,9 @@ function ClosePositionDialog({ position, userAddress }: ClosePositionDialogProps
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2 flex-1">
           <X className="h-4 w-4" />
-          Close
+          Close Position
         </Button>
       </DialogTrigger>
 

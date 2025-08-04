@@ -31,6 +31,181 @@ export interface LPPosition {
   }
 }
 
+// Interface for Meteora API pair data
+interface MeteoraApiPair {
+  address: string
+  name: string
+  mint_x: string
+  mint_y: string
+  current_price: number
+  trade_volume_24h: number
+  liquidity: string
+  hide: boolean
+  is_blacklisted: boolean
+}
+
+interface MeteoraApiResponse {
+  groups: Array<{
+    name: string
+    pairs: MeteoraApiPair[]
+  }>
+}
+
+// Active pairs scan - checks most active pairs for user positions
+async function discoverViaActivePairs(
+  userAddress: PublicKey, 
+  connection: any,
+  maxPairsToCheck: number = 100
+): Promise<LPPosition[]> {
+  console.log('🔍 Starting position discovery via active pairs scan...')
+  console.log(`👤 User address: ${userAddress.toString()}`)
+  
+  try {
+    // Get all pairs from Meteora API
+    console.log('📡 Fetching pairs from Meteora API...')
+    const response = await fetch('https://dlmm-api.meteora.ag/pair/all_by_groups')
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pairs from Meteora API: ${response.status}`)
+    }
+    
+    const meteoraData: MeteoraApiResponse = await response.json()
+    const allPairs = meteoraData.groups.flatMap(group => group.pairs)
+    
+    console.log(`📊 Total pairs from API: ${allPairs.length}`)
+    
+    // Filter and sort pairs by activity (volume + liquidity)
+    const activePairs = allPairs
+      .filter(pair => {
+        // Filter out hidden, blacklisted, or pairs with no data
+        const isValid = !pair.hide && 
+                       !pair.is_blacklisted && 
+                       pair.liquidity && 
+                       parseFloat(pair.liquidity) > 0 &&
+                       pair.trade_volume_24h > 0
+        
+        if (!isValid) {
+          console.log(`⏭️  Skipping pair ${pair.name}: hidden=${pair.hide}, blacklisted=${pair.is_blacklisted}, liquidity=${pair.liquidity}, volume=${pair.trade_volume_24h}`)
+        }
+        
+        return isValid
+      })
+      .sort((a, b) => {
+        // Sort by combined score of volume and liquidity for better prioritization
+        const scoreA = (a.trade_volume_24h || 0) + (parseFloat(a.liquidity || '0') / 1000) // Normalize liquidity
+        const scoreB = (b.trade_volume_24h || 0) + (parseFloat(b.liquidity || '0') / 1000)
+        return scoreB - scoreA
+      })
+      .slice(0, maxPairsToCheck) // Limit to prevent timeout
+    
+    console.log(`🎯 Will check ${activePairs.length} most active pairs for positions`)
+    console.log(`🏆 Top 5 pairs by activity:`)
+    activePairs.slice(0, 5).forEach((pair, idx) => {
+      console.log(`   ${idx + 1}. ${pair.name} - Volume: $${pair.trade_volume_24h?.toLocaleString()}, TVL: $${parseFloat(pair.liquidity)?.toLocaleString()}`)
+    })
+    
+    const allPositions: LPPosition[] = []
+    let checkedCount = 0
+    let foundPositionsCount = 0
+    
+    // Check each pair for user positions
+    for (const pair of activePairs) {
+      try {
+        checkedCount++
+        
+        if (checkedCount % 10 === 0) {
+          console.log(`🔄 Progress: ${checkedCount}/${activePairs.length} pairs checked, ${foundPositionsCount} positions found so far`)
+        }
+        
+        // Create DLMM instance for this pair
+        const dlmmPool = await DLMM.create(connection, new PublicKey(pair.address))
+        
+        // Check for user positions in this pair
+        const { userPositions } = await dlmmPool.getPositionsByUserAndLbPair(userAddress)
+        
+        if (userPositions && userPositions.length > 0) {
+          foundPositionsCount++
+          console.log(`✅ FOUND ${userPositions.length} position(s) in ${pair.name} (${pair.address})`)
+          
+          // Process each position found
+          for (const position of userPositions) {
+            try {
+              const positionData = {
+                address: position.publicKey.toString(),
+                pairAddress: pair.address,
+                pairName: pair.name,
+                owner: userAddress.toString(),
+                lowerBinId: position.positionData.lowerBinId,
+                upperBinId: position.positionData.upperBinId,
+                lastUpdatedAt: position.positionData.lastUpdatedAt.toString(),
+                totalXAmount: position.positionData.totalXAmount.toString(),
+                totalYAmount: position.positionData.totalYAmount.toString(),
+                binData: position.positionData.positionBinData.map((bin: any) => ({
+                  binId: bin.binId,
+                  xAmount: bin.xAmount?.toString() || '0',
+                  yAmount: bin.yAmount?.toString() || '0',
+                  supply: bin.binLiquidity?.toString() || '0'
+                })),
+                pair: {
+                  name: pair.name,
+                  mint_x: pair.mint_x,
+                  mint_y: pair.mint_y,
+                  current_price: pair.current_price || 0,
+                }
+              }
+              
+              allPositions.push(positionData)
+              
+              console.log(`📍 Position details:`)
+              console.log(`   Address: ${positionData.address}`)
+              console.log(`   Bins: ${positionData.lowerBinId} - ${positionData.upperBinId}`)
+              console.log(`   X Amount: ${positionData.totalXAmount}`)
+              console.log(`   Y Amount: ${positionData.totalYAmount}`)
+              
+            } catch (positionError: any) {
+              console.warn(`⚠️  Error processing position in ${pair.name}:`, positionError?.message)
+            }
+          }
+        }
+        
+        // Add small delay every 10 pairs to prevent overwhelming the RPC
+        if (checkedCount % 10 === 0 && checkedCount < activePairs.length) {
+          console.log('⏸️  Brief pause to prevent RPC overload...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+        
+      } catch (pairError: any) {
+        console.warn(`⚠️  Error checking pair ${pair.name} (${pair.address}):`, pairError?.message)
+        // Continue to next pair - don't let one pair failure stop the whole process
+      }
+    }
+    
+    console.log(`🎉 DISCOVERY COMPLETE!`)
+    console.log(`📊 Final Results:`)
+    console.log(`   - Checked: ${checkedCount} pairs`)
+    console.log(`   - Found: ${allPositions.length} total positions`)
+    console.log(`   - Pairs with positions: ${foundPositionsCount}`)
+    
+    if (allPositions.length > 0) {
+      console.log(`🏆 Position Summary:`)
+      allPositions.forEach((pos, idx) => {
+        console.log(`   ${idx + 1}. ${pos.pairName} - Position: ${pos.address}`)
+      })
+    } else {
+      console.log(`ℹ️  No positions found. This could mean:`)
+      console.log(`   - User has no LP positions`)
+      console.log(`   - Positions are in pairs outside top ${maxPairsToCheck} most active`)
+      console.log(`   - Positions were recently created and not yet indexed`)
+    }
+    
+    return allPositions
+    
+  } catch (error: any) {
+    console.error('❌ Active pairs discovery failed:', error)
+    throw error
+  }
+}
+
 // Export the hook to get all LP positions for a wallet
 export function useGetLPPositions({ address }: { address: PublicKey }) {
   const { connection } = useConnection()
@@ -39,213 +214,100 @@ export function useGetLPPositions({ address }: { address: PublicKey }) {
     queryKey: ['get-lp-positions', { endpoint: connection.rpcEndpoint, address: address.toString() }],
     queryFn: async (): Promise<LPPosition[]> => {
       try {
-        console.log('Fetching LP positions for user:', address.toString())
-
-        // ✅ FIXED: Use your paid custom RPC first
-        const heavyRpcUrl = process.env.NEXT_PUBLIC_Custom_RPC_URL ||     // Your paid RPC
+        console.log('🚀 Starting LP position discovery...')
+        console.log(`🌐 RPC Endpoint: ${connection.rpcEndpoint}`)
+        
+        // Use custom RPC for heavy operations if available
+        const customRpcUrl = process.env.NEXT_PUBLIC_Custom_RPC_URL ||
           process.env.NEXT_PUBLIC_HEAVY_RPC_URL ||
           process.env.NEXT_PUBLIC_RPC_URL ||
-          'https://api.mainnet-beta.solana.com'
-
-        console.log('Using RPC for position discovery:', heavyRpcUrl)
-
-        // ✅ ADDED: Warn if using public RPC
-        if (heavyRpcUrl.includes('api.mainnet-beta.solana.com')) {
-          console.warn('⚠️  Using public RPC for heavy operations - this may fail!')
-          console.warn('💡 Set NEXT_PUBLIC_Custom_RPC_URL in your .env.local file')
-        } else {
-          console.log('✅ Using custom RPC for position discovery')
-        }
-
-        // ✅ ENHANCED: Better connection configuration for paid RPC
-        const heavyConnection = new (await import('@solana/web3.js')).Connection(
-          heavyRpcUrl,
-          {
-            commitment: 'confirmed',
-            confirmTransactionInitialTimeout: 60000,  // 60 seconds for paid RPC
-            httpHeaders: {
-              "Content-Type": "application/json",
-              // Add any custom headers your RPC provider requires
-            }
-          }
-        )
-
-        // ✅ ADDED: Test RPC connectivity first
+          connection.rpcEndpoint
+        
+        console.log(`🔧 Using RPC for discovery: ${customRpcUrl}`)
+        
+        // Create optimized connection for heavy operations
+        const discoveryConnection = customRpcUrl !== connection.rpcEndpoint
+          ? new (await import('@solana/web3.js')).Connection(
+              customRpcUrl,
+              {
+                commitment: 'confirmed',
+                confirmTransactionInitialTimeout: 60000,
+                httpHeaders: {
+                  "Content-Type": "application/json",
+                }
+              }
+            )
+          : connection
+        
+        // Test connection first
         try {
-          console.log('Testing RPC connection...')
-          const version = await heavyConnection.getVersion()
-          console.log('✅ RPC connection successful, version:', version)
+          console.log('🧪 Testing RPC connection...')
+          const version = await discoveryConnection.getVersion()
+          console.log('✅ RPC connection successful:', version)
         } catch (rpcError: any) {
-          console.error('❌ RPC connection failed:', rpcError)
+          console.error('❌ RPC connection test failed:', rpcError)
           throw new Error(`RPC connection failed: ${rpcError?.message || 'Unknown RPC error'}`)
         }
-
-        console.log('Starting position discovery with getPositionsByUserAndLbPair method...')
-
-        // ✅ BETTER APPROACH: Use getPositionsByUserAndLbPair for known pair
-        // We know from the logs that your position is in pair: 5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6
-        const knownPairAddress = '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
-
-        console.log(`🔍 Checking for positions in known pair: ${knownPairAddress}`)
-
-        const lpPositions: LPPosition[] = []
-
-        try {
-          // Create DLMM instance for the known pair
-          const dlmmPool = await DLMM.create(heavyConnection, new PublicKey(knownPairAddress))
-
-          // Use the more direct method from the official docs
-          const { userPositions } = await dlmmPool.getPositionsByUserAndLbPair(address)
-
-          console.log(`✅ Found ${userPositions.length} position(s) in pair using getPositionsByUserAndLbPair`)
-
-          if (userPositions.length > 0) {
-            // Get pair name from the tokens
-            let pairName = 'Unknown Pair'
-            try {
-              const tokenXMint = dlmmPool.tokenX.publicKey.toString()
-              const tokenYMint = dlmmPool.tokenY.publicKey.toString()
-
-              const getTokenSymbol = (mint: string) => {
-                const tokenMap: { [key: string]: string } = {
-                  'So11111111111111111111111111111111111111112': 'SOL',
-                  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
-                  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDT',
-                  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'BONK',
-                  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'JUP',
-                  'WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk': 'WEN',
-                  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': 'mSOL',
-                  'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn': 'jitoSOL',
-                  '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs': 'ETH',
-                  '2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk': 'BTC',
-                  'A9mUU4qviSctJVPJdBJWkb28deg915LYJKrzQ19ji3FM': 'USDCet',
-                }
-                return tokenMap[mint] || mint.slice(0, 4) + '...'
-              }
-
-              pairName = `${getTokenSymbol(tokenXMint)}/${getTokenSymbol(tokenYMint)}`
-            } catch (nameError) {
-              console.warn('Error getting pair name:', nameError)
-            }
-
-            // Process each position
-            for (const position of userPositions) {
-              try {
-                lpPositions.push({
-                  address: position.publicKey.toString(),
-                  pairAddress: knownPairAddress,
-                  pairName: pairName,
-                  owner: address.toString(),
-                  lowerBinId: position.positionData.lowerBinId,
-                  upperBinId: position.positionData.upperBinId,
-                  lastUpdatedAt: position.positionData.lastUpdatedAt.toString(),
-                  totalXAmount: position.positionData.totalXAmount.toString(),
-                  totalYAmount: position.positionData.totalYAmount.toString(),
-                  binData: position.positionData.positionBinData.map((bin: any) => ({
-                    binId: bin.binId,
-                    xAmount: bin.xAmount?.toString() || '0',
-                    yAmount: bin.yAmount?.toString() || '0',
-                    supply: bin.binLiquidity?.toString() || '0'
-                  })),
-                  pair: {
-                    name: pairName,
-                    mint_x: dlmmPool.tokenX.publicKey.toString(),
-                    mint_y: dlmmPool.tokenY.publicKey.toString(),
-                    current_price: 0,
-                  }
-                })
-
-                console.log(`✅ Processed position: ${position.publicKey.toString()} in ${pairName}`)
-              } catch (positionError: any) {
-                console.warn(`Error processing position ${position.publicKey.toString()}:`, positionError?.message)
-              }
-            }
-          } else {
-            console.log('⚠️  No positions found in this pair')
-          }
-
-        } catch (pairError: any) {
-          console.error(`❌ Error checking pair ${knownPairAddress}:`, pairError?.message)
-
-          // Fallback: If the pair-specific check fails, we'll report the issue
-          console.log('🔄 Pair-specific position check failed. Possible reasons:')
-          console.log('   1. Position might be in a different pair')
-          console.log('   2. Position might be very new and not indexed')
-          console.log('   3. RPC might be having issues with this specific pair')
-        }
-
-        console.log(`🎉 Successfully processed ${lpPositions.length} LP positions using custom RPC`)
-
-        // ✅ ADDED: Log position details for debugging
-        if (lpPositions.length > 0) {
-          lpPositions.forEach(pos => {
-            console.log(`📍 Position found: ${pos.pairName} - ${pos.address}`)
-          })
-        } else {
-          console.log('⚠️  No LP positions found. This could mean:')
-          console.log('   1. Position data structure has changed in the SDK')
-          console.log('   2. Positions are in different pairs than expected')
-          console.log('   3. getPositionsByUserAndLbPair is not finding your position')
-          console.log('   4. Your position might be very new and not indexed yet')
-        }
-
-        return lpPositions
-
+        
+        // Start position discovery
+        const positions = await discoverViaActivePairs(address, discoveryConnection, 100)
+        
+        return positions
+        
       } catch (error: any) {
-        console.error('❌ Error fetching LP positions:', error)
-
-        // ✅ ENHANCED: Better error handling and guidance
+        console.error('❌ LP position discovery failed:', error)
+        
+        // Enhanced error handling and guidance
         const errorMessage = error?.message || 'Unknown error'
-
+        
         if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
-          console.error('❌ 403 Forbidden Error Details:')
-          console.error('   - Your RPC is blocking heavy operations')
-          console.error('   - Contact your RPC provider about getProgramAccounts limits')
-          console.error('   - Verify NEXT_PUBLIC_Custom_RPC_URL is set correctly')
+          console.error('💡 RPC Error Solution:')
+          console.error('   - Your RPC is blocking heavy operations (getProgramAccounts)')
+          console.error('   - Set NEXT_PUBLIC_Custom_RPC_URL in your .env.local file')
+          console.error('   - Use a paid RPC provider like Alchemy, QuickNode, or Helius')
         } else if (errorMessage.includes('timeout')) {
-          console.error('❌ Timeout Error Details:')
-          console.error('   - Position discovery took longer than 90 seconds')
-          console.error('   - Your RPC might be slow or overloaded')
+          console.error('💡 Timeout Error Solution:')
+          console.error('   - Position discovery took longer than expected')
           console.error('   - Try again in a few minutes')
+          console.error('   - Consider using a faster RPC provider')
         } else if (errorMessage.includes('connection')) {
-          console.error('❌ Connection Error Details:')
-          console.error('   - Unable to connect to your custom RPC')
-          console.error('   - Verify your RPC URL is correct and accessible')
-          console.error('   - Check if your RPC requires authentication')
+          console.error('💡 Connection Error Solution:')
+          console.error('   - Check your internet connection')
+          console.error('   - Verify your RPC URL is correct')
+          console.error('   - Try switching to a different RPC endpoint')
         } else {
-          console.error('❌ Unexpected Error:', errorMessage)
+          console.error(`💡 Unexpected Error: ${errorMessage}`)
           console.error('   - This might be a temporary issue')
           console.error('   - Try refreshing the page')
         }
-
-        // Return empty array instead of throwing
-        console.log('🔄 Falling back to empty positions array')
+        
+        // Return empty array instead of throwing to prevent UI crashes
         return []
       }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - reasonable for paid RPC
+    staleTime: 5 * 60 * 1000, // 5 minutes - positions don't change frequently
     retry: (failureCount, error: any) => {
-      // ✅ ENHANCED: Smart retry logic
       const errorMessage = error?.message || 'Unknown error'
-
-      if (errorMessage.includes('403')) {
+      
+      // Don't retry certain errors that won't resolve with retries
+      if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
         console.log('❌ Not retrying 403 errors - RPC configuration issue')
-        return false
-      }
-      if (errorMessage.includes('timeout')) {
-        console.log('❌ Not retrying timeout errors immediately')
         return false
       }
       if (errorMessage.includes('connection')) {
         console.log('❌ Not retrying connection errors - check RPC URL')
         return false
       }
-
-      console.log(`🔄 Retrying... (attempt ${failureCount + 1}/3)`)
+      
+      console.log(`🔄 Retrying position discovery... (attempt ${failureCount + 1}/3)`)
       return failureCount < 2
     },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-    refetchOnWindowFocus: false, // Don't refetch on focus to avoid excessive requests
+    retryDelay: (attemptIndex) => {
+      const delay = Math.min(1000 * 2 ** attemptIndex, 30000)
+      console.log(`⏳ Waiting ${delay}ms before retry...`)
+      return delay
+    },
+    refetchOnWindowFocus: false, // Don't refetch on window focus to avoid excessive API calls
   })
 }
 
@@ -265,7 +327,7 @@ export function useCloseLPPosition({ address }: { address: PublicKey }) {
       try {
         console.log('Starting close position for:', positionAddress, 'in pair:', pairAddress)
 
-        // ✅ ENHANCED: Use custom RPC for closing positions too
+        // Use custom RPC for closing positions too
         const customRpcUrl = process.env.NEXT_PUBLIC_Custom_RPC_URL || connection.rpcEndpoint
         const closeConnection = customRpcUrl !== connection.rpcEndpoint
           ? new (await import('@solana/web3.js')).Connection(customRpcUrl, { commitment: 'confirmed' })
@@ -284,17 +346,12 @@ export function useCloseLPPosition({ address }: { address: PublicKey }) {
 
         console.log('Position found, creating close transaction...')
 
-        // ✅ SIMPLIFIED: Just check total amounts from position data
-        console.log('Checking if position has liquidity that needs to be removed...')
-
         const totalX = Number(position.positionData.totalXAmount.toString())
         const totalY = Number(position.positionData.totalYAmount.toString())
 
         console.log(`📊 Position totals: X=${totalX}, Y=${totalY}`)
 
-        // If either total amount exists, we need to remove liquidity
         const hasLiquidity = totalX > 0 || totalY > 0
-
         console.log(`🔍 Position has liquidity: ${hasLiquidity}`)
 
         let signature: string
@@ -302,7 +359,6 @@ export function useCloseLPPosition({ address }: { address: PublicKey }) {
         if (hasLiquidity) {
           console.log('✅ Position has liquidity, removing all liquidity first...')
 
-          // Remove all liquidity from the position first
           const removeLiquidityResult = await dlmmPool.removeLiquidity({
             user: address,
             position: new PublicKey(positionAddress),
@@ -314,25 +370,19 @@ export function useCloseLPPosition({ address }: { address: PublicKey }) {
 
           console.log('Sending remove liquidity and close transaction...')
 
-          // Handle both single transaction and transaction array
           if (Array.isArray(removeLiquidityResult)) {
-            // If it's an array of transactions, we need to send them sequentially
-            console.log(`Sending ${removeLiquidityResult.length} transactions...`)
-
             let lastSignature = ''
             for (const [index, tx] of removeLiquidityResult.entries()) {
               console.log(`Sending transaction ${index + 1}/${removeLiquidityResult.length}...`)
               lastSignature = await sendTransaction(tx, connection)
               console.log(`Transaction ${index + 1} sent:`, lastSignature)
 
-              // Wait for confirmation before sending next transaction
               if (index < removeLiquidityResult.length - 1) {
                 await confirmTransactionWithPolling(lastSignature, connection)
               }
             }
             signature = lastSignature
           } else {
-            // Single transaction
             signature = await sendTransaction(removeLiquidityResult, connection)
           }
 
@@ -341,24 +391,19 @@ export function useCloseLPPosition({ address }: { address: PublicKey }) {
         } else {
           console.log('✅ Position is empty, closing directly...')
 
-          // Position is empty, can close directly
           const closePositionTx = await dlmmPool.closePosition({
             owner: address,
             position: position,
           })
 
           console.log('Sending close position transaction...')
-
-          // Send transaction using the regular connection (wallet adapter)
           signature = await sendTransaction(closePositionTx, connection)
-
           console.log('Close position transaction sent:', signature)
         }
 
-        // Confirm final transaction with polling
         await confirmTransactionWithPolling(signature, connection)
 
-        console.log('🎉 Position liquidity removed and/or position closed successfully!')
+        console.log('🎉 Position closed successfully!')
         return signature
 
       } catch (error: any) {
@@ -388,11 +433,11 @@ export function useCloseLPPosition({ address }: { address: PublicKey }) {
   })
 }
 
-// ✅ ENHANCED: Better polling-based transaction confirmation
+// Helper function for transaction confirmation
 const confirmTransactionWithPolling = async (
   signature: string,
   connection: any,
-  maxRetries = 45  // Increased for better reliability
+  maxRetries = 45
 ): Promise<boolean> => {
   console.log('🔄 Starting transaction confirmation with polling...')
 
@@ -414,18 +459,15 @@ const confirmTransactionWithPolling = async (
         throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`)
       }
 
-      // ✅ OPTIMIZED: Shorter wait time for better UX
       await new Promise(resolve => setTimeout(resolve, 2000))
 
     } catch (error) {
       console.warn(`Confirmation attempt ${attempt + 1} failed:`, error)
 
-      // If it's the last attempt, throw the error
       if (attempt === maxRetries - 1) {
         throw error
       }
 
-      // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
