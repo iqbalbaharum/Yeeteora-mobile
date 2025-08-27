@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TrendingUp, Activity, ChevronDown, ChevronUp, ExternalLink, Award, Zap } from 'lucide-react'
-import { YeetModal } from './yeet-modal'
+import { Input } from '@/components/ui/input'
+import { RefreshCw, TrendingUp, Activity, Search } from 'lucide-react'
+// import { YeetModal } from './yeet-modal'
 import { useQuery } from '@tanstack/react-query'
 import { AddLPPosition } from './meteora-add-lp-position'
 
@@ -95,7 +96,7 @@ const filterStrategies = {
   oneSided: (pairs: DLMMPair[]): DLMMPair[] => {
     const SOL_MINT = 'So11111111111111111111111111111111111111112'
 
-    return pairs.filter(pair => {
+    return pairs.filter((pair) => {
       // Must be a SOL pair
       const isSOLPair = pair.mint_x === SOL_MINT || pair.mint_y === SOL_MINT
       if (!isSOLPair) return false
@@ -110,7 +111,8 @@ const filterStrategies = {
       const estimatedMarketCap = tvl * 2
 
       // Get 6h volume from the volume object
-      const volume6h = pair.volume?.hour_1 * 6 || pair.volume?.hour_2 * 3 || pair.volume?.hour_4 * 1.5 || pair.trade_volume_24h / 4
+      const volume6h =
+        pair.volume?.hour_1 * 6 || pair.volume?.hour_2 * 3 || pair.volume?.hour_4 * 1.5 || pair.trade_volume_24h / 4
 
       return (
         estimatedMarketCap > 1_000_000 && // > $1M market cap
@@ -129,9 +131,9 @@ const getAllStrategyPairs = (pairs: DLMMPair[]): DLMMPair[] => {
   const allStrategyPairs = new Set<DLMMPair>()
 
   // Collect pairs from all individual strategies
-  Object.values(filterStrategies).forEach(strategyFilter => {
+  Object.values(filterStrategies).forEach((strategyFilter) => {
     const strategyPairs = strategyFilter(pairs)
-    strategyPairs.forEach(pair => allStrategyPairs.add(pair))
+    strategyPairs.forEach((pair) => allStrategyPairs.add(pair))
   })
 
   return Array.from(allStrategyPairs)
@@ -140,12 +142,32 @@ const getAllStrategyPairs = (pairs: DLMMPair[]): DLMMPair[] => {
 type FilterStrategy = keyof typeof filterStrategies | 'all'
 
 // LP Pair Card Component
-function LPPairCard({ pair, rank }: { pair: DLMMPair; rank: number }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+function LPPairCard({ pair}: { pair: DLMMPair; rank: number }) {
+// function LPPairCard({ pair, rank }: { pair: DLMMPair; rank: number }) {
+  // Console log the COMPLETE pool data as JSON for easy copying
+  // console.log(`Pool ${rank} - ${pair.name} - FULL JSON:`)
+  // console.log(JSON.stringify(pair, null, 2))
 
   const isSOLPair = (pair: DLMMPair): boolean => {
     const SOL_MINT = 'So11111111111111111111111111111111111111112'
     return pair.mint_x === SOL_MINT || pair.mint_y === SOL_MINT
+  }
+
+  // Determine which strategy this pair matches
+  const getPairStrategy = (pair: DLMMPair): string => {
+    const strategies: { name: string; filter: (pairs: DLMMPair[]) => DLMMPair[] }[] = [
+      { name: 'One Sided', filter: filterStrategies.oneSided },
+      // Add more strategies here as they're implemented
+    ]
+
+    for (const strategy of strategies) {
+      const matchingPairs = strategy.filter([pair])
+      if (matchingPairs.length > 0) {
+        return strategy.name
+      }
+    }
+
+    return 'General'
   }
 
   const formatNumber = (num?: number) => {
@@ -156,18 +178,151 @@ function LPPairCard({ pair, rank }: { pair: DLMMPair; rank: number }) {
     return `$${num.toFixed(2)}`
   }
 
-  const formatPercentage = (num?: number) => {
-    if (num === undefined || num === null) return 'N/A'
-    return `${num > 0 ? '+' : ''}${num.toFixed(2)}%`
-  }
+  // const formatPercentage = (num?: number) => {
+  //   if (num === undefined || num === null) return 'N/A'
+  //   return `${num > 0 ? '+' : ''}${num.toFixed(2)}%`
+  // }
 
-  const getRankColor = (rank: number) => {
-    if (rank === 1) return 'text-yellow-400'
-    if (rank <= 3) return 'text-orange-400'
-    if (rank <= 10) return 'text-primary'
-    return 'text-muted-foreground'
-  }
+  // const getRankColor = (rank: number) => {
+  //   if (rank === 1) return 'text-yellow-400'
+  //   if (rank <= 3) return 'text-orange-400'
+  //   if (rank <= 10) return 'text-primary'
+  //   return 'text-muted-foreground'
+  // }
 
+  return (
+    <>
+      {/* Desktop Table Row (lg and above) */}
+      <div className="hidden lg:block">
+        <div
+          className="grid grid-cols-9 gap-4 p-6 border border-border rounded-[12px] hover:bg-primary/50 transition-all duration-200"
+          style={{
+            background: 'linear-gradient(180deg, rgba(51, 133, 255, 0.1) 0%, rgba(51, 133, 255, 0) 100%)',
+          }}
+        >
+          {/* Pair Column */}
+          <div className="flex flex-col items-start gap-3">
+            <div>
+              <div className="text-white font-serif font-semibold">{pair.name}</div>
+              <div className="text-sm text-muted-foreground font-serif">
+                {pair.address.slice(0, 8)}...{pair.address.slice(-8)}
+              </div>
+            </div>
+          </div>
+
+          {/* 24hr APR Column */}
+          <div className="flex items-center justify-end">
+            <div className="text-primary font-medium font-serif text-sm">
+              {pair.apr ? `${pair.apr.toFixed(2)}%` : 'N/A'}
+            </div>
+          </div>
+
+          {/* TVL Column */}
+          <div className="flex items-center justify-end">
+            <div className="text-white font-medium font-serif text-sm">
+              {formatNumber(parseFloat(pair.liquidity || '0'))}
+            </div>
+          </div>
+
+          {/* 24h Volume Column */}
+          <div className="flex items-center justify-end">
+            <div className="text-white font-medium font-serif text-sm">{formatNumber(pair.trade_volume_24h)}</div>
+          </div>
+
+          {/* 24h Fees Column */}
+          <div className="flex items-center justify-end">
+            <div className="text-white font-medium font-serif text-sm">{formatNumber(pair.fees_24h)}</div>
+          </div>
+
+          {/* Current Price Column */}
+          <div className="flex items-center justify-end">
+            <div className="text-white font-medium font-serif text-sm">
+              {pair.current_price ? pair.current_price.toFixed(6) : 'N/A'}
+            </div>
+          </div>
+
+          {/* Bin Step Column */}
+          <div className="flex items-center justify-center">
+            <div className="text-white font-medium font-serif text-sm">{pair.bin_step || 'N/A'}</div>
+          </div>
+
+          {/* Strategy Column */}
+          <div className="flex items-center justify-center">
+            <div className="text-primary font-medium font-serif text-sm bg-secondary-foreground px-2 py-1 rounded-[8px]">
+              {getPairStrategy(pair)}
+            </div>
+          </div>
+
+          {/* Add LP Column */}
+          <div className="flex items-center justify-center">
+            <AddLPPosition pairAddress={pair.address} pairName={pair.name} isSOLPair={isSOLPair(pair)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile/Tablet Card Layout (below lg) */}
+      <div className="block lg:hidden">
+        <div
+          className="p-4 border border-border rounded-[12px] hover:bg-primary/50 transition-all duration-200"
+          style={{
+            background: 'linear-gradient(180deg, rgba(51, 133, 255, 0.1) 0%, rgba(51, 133, 255, 0) 100%)',
+          }}
+        >
+          {/* Header with Pair Name and Strategy */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="text-white font-serif font-semibold text-lg">{pair.name}</div>
+                <div className="text-xs text-muted-foreground font-serif">
+                  {pair.address.slice(0, 8)}...{pair.address.slice(-8)}
+                </div>
+              </div>
+            </div>
+            <div className="text-primary font-medium font-serif text-xs bg-secondary-foreground px-2 py-1 rounded-[8px]">
+              {getPairStrategy(pair)}
+            </div>
+          </div>
+
+          {/* Two Column Grid for Key Metrics */}
+          <div className="grid md:grid-cols-3 grid-cols-2 gap-4 mb-4">
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground font-serif mb-1">24hr APR</div>
+              <div className="text-primary font-medium font-serif">{pair.apr ? `${pair.apr.toFixed(2)}%` : 'N/A'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground font-serif mb-1">TVL</div>
+              <div className="text-white font-medium font-serif">{formatNumber(parseFloat(pair.liquidity || '0'))}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground font-serif mb-1">24h Volume</div>
+              <div className="text-white font-medium font-serif text-sm">{formatNumber(pair.trade_volume_24h)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground font-serif mb-1">24h Fees</div>
+              <div className="text-white font-medium font-serif text-sm">{formatNumber(pair.fees_24h)}</div>
+            </div>
+             <div className="text-center">
+              <div className="text-xs text-muted-foreground font-serif mb-1">Price</div>
+              <div className="text-white font-medium font-serif text-sm">
+                {pair.current_price ? pair.current_price.toFixed(6) : 'N/A'}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground font-serif mb-1">Bin Step</div>
+              <div className="text-white font-medium font-serif text-sm">{pair.bin_step || 'N/A'}</div>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex justify-center pt-2 border-t border-border/30">
+            <AddLPPosition pairAddress={pair.address} pairName={pair.name} isSOLPair={isSOLPair(pair)} />
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  /* Old card-based layout (commented out)
   return (
     <div className="gradient-card rounded-2xl p-4 hover:scale-[1.02] transition-all duration-200 border border-border/50">
       <div className="flex items-center justify-between mb-3">
@@ -267,20 +422,35 @@ function LPPairCard({ pair, rank }: { pair: DLMMPair; rank: number }) {
       </div>
     </div>
   )
+  */
 }
 
 export function MeteoraStrategyFilter() {
   const [activeFilter, setActiveFilter] = useState<FilterStrategy>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const { data: meteoraData, isLoading, isError, refetch } = useMeteoraData()
 
   // Get all pairs from all groups
-  const allPairs = meteoraData?.groups.flatMap(group => group.pairs) || []
+  const allPairs = meteoraData?.groups.flatMap((group) => group.pairs) || []
 
-  // Apply selected filter and sort by APR
-  const filteredPairs = (activeFilter === 'all'
-    ? getAllStrategyPairs(allPairs)
-    : filterStrategies[activeFilter](allPairs)
-  ).sort((a, b) => (b.apr || 0) - (a.apr || 0))
+  // Apply selected filter and search query, then sort by APR
+  const filteredPairs = (
+    activeFilter === 'all' ? getAllStrategyPairs(allPairs) : filterStrategies[activeFilter](allPairs)
+  )
+    .filter((pair) => {
+      if (!searchQuery.trim()) return true
+
+      const query = searchQuery.toLowerCase().trim()
+
+      // Search by pair name
+      if (pair.name?.toLowerCase().includes(query)) return true
+
+      // Search by pair address
+      if (pair.address?.toLowerCase().includes(query)) return true
+
+      return false
+    })
+    .sort((a, b) => (b.apr || 0) - (a.apr || 0))
 
   if (isError) {
     return (
@@ -295,18 +465,17 @@ export function MeteoraStrategyFilter() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="lg:px-[70px] px-4 mx-auto space-y-12">
       {/* Filter Controls */}
-      <div className="glass-effect rounded-2xl p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <div className="flex flex-col lg:flex-row lg:items-center item-start justify-between gap-4">
           <div className="flex flex-wrap gap-2">
             <Button
               variant={activeFilter === 'all' ? 'default' : 'outline'}
               onClick={() => {
-                console.log('Clicking All Strategies, current filter:', activeFilter)
+                // console.log('Clicking All Strategies, current filter:', activeFilter)
                 setActiveFilter('all')
               }}
-              className={`gap-2 rounded-full ${activeFilter === 'all' ? 'gradient-primary text-white border-0' : ''}`}
             >
               <Activity className="h-4 w-4" />
               All Strategies
@@ -315,55 +484,56 @@ export function MeteoraStrategyFilter() {
             <Button
               variant={activeFilter === 'oneSided' ? 'default' : 'outline'}
               onClick={() => {
-                console.log('Clicking One Sided, current filter:', activeFilter)
+                // console.log('Clicking One Sided, current filter:', activeFilter)
                 setActiveFilter('oneSided')
               }}
-              className={`gap-2 rounded-full ${activeFilter === 'oneSided' ? 'gradient-primary text-white border-0' : ''}`}
             >
               <TrendingUp className="h-4 w-4" />
               One Sided
             </Button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">
-              {filteredPairs.length} pairs found
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="gap-2 rounded-full"
-            >
+          <div className="flex items-center flex-wrap md:flex-nowrap mt-6 lg:mt-0 gap-3">
+            <span className="text-sm text-muted-foreground text-nowrap">{filteredPairs.length} pairs found</span>
+            {/* Refresh Button */}
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+
+            {/* Search Input */}
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by token name or contract"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 border-primary rounded-[8px] h-[32px]"
+              />
+            </div>
           </div>
         </div>
 
         {/* Strategy Info Panel */}
-        {activeFilter === 'all' && (
+        {/* {activeFilter === 'all' && (
           <div className="mt-4 p-4 rounded-xl gradient-accent/10 border border-primary/20">
-            <h3 className="font-semibold text-primary mb-2 text-sm">
-              All Strategies Combined
-            </h3>
+            <h3 className="font-semibold text-primary mb-2 text-sm">All Strategies Combined</h3>
             <p className="text-xs text-muted-foreground">
-              Showing all pairs that meet any strategy requirements. One-sided strategy includes SOL pairs with strong fundamentals.
+              Showing all pairs that meet any strategy requirements. One-sided strategy includes SOL pairs with strong
+              fundamentals.
             </p>
           </div>
         )}
 
         {activeFilter === 'oneSided' && (
           <div className="mt-4 p-4 rounded-xl gradient-accent/10 border border-primary/20">
-            <h3 className="font-semibold text-primary mb-2 text-sm">
-              One Sided Strategy
-            </h3>
+            <h3 className="font-semibold text-primary mb-2 text-sm">One Sided Strategy</h3>
             <p className="text-xs text-muted-foreground">
               SOL pairs with market cap &gt; $1M, 24h volume &gt; $2M, and strong 6h volume.
             </p>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* LP Pairs List */}
@@ -385,13 +555,45 @@ export function MeteoraStrategyFilter() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredPairs.slice(0, 20).map((pair, index) => (
-            <LPPairCard key={pair.address} pair={pair} rank={index + 1} />
-          ))}
+        <div>
+          {/* Desktop Table Header (lg and above) */}
+          <div className="hidden lg:block">
+            <div className="grid grid-cols-9 gap-4 px-4 py-4 mb-4 border-b border-border/30 bg-background/50 rounded-lg">
+              <div className="text-left text-xs font-medium text-muted-foreground tracking-wider font-serif">Pair</div>
+              <div className="text-right text-xs font-medium text-muted-foreground tracking-wider font-serif">
+                24hr APR
+              </div>
+              <div className="text-right text-xs font-medium text-muted-foreground tracking-wider font-serif">TVL</div>
+              <div className="text-right text-xs font-medium text-muted-foreground tracking-wider font-serif">
+                24h Volume
+              </div>
+              <div className="text-right text-xs font-medium text-muted-foreground tracking-wider font-serif">
+                24h Fees
+              </div>
+              <div className="text-right text-xs font-medium text-muted-foreground tracking-wider font-serif">
+                Current Price
+              </div>
+              <div className="text-center text-xs font-medium text-muted-foreground tracking-wider font-serif">
+                Bin Step
+              </div>
+              <div className="text-center text-xs font-medium text-muted-foreground tracking-wider font-serif">
+                Strategy
+              </div>
+              {/* <div className="text-center text-xs font-medium text-muted-foreground tracking-wider font-serif">
+              Yeet
+            </div> */}
+            </div>
+          </div>
+
+          {/* Responsive Rows/Cards with gaps */}
+          <div className="space-y-4">
+            {filteredPairs.slice(0, 20).map((pair, index) => (
+              <LPPairCard key={pair.address} pair={pair} rank={index + 1} />
+            ))}
+          </div>
 
           {filteredPairs.length > 20 && (
-            <div className="text-center pt-4">
+            <div className="text-center pt-6 mt-6 border-t border-border/30">
               <p className="text-sm text-muted-foreground">
                 Showing top 20 opportunities. {filteredPairs.length - 20} more available.
               </p>
