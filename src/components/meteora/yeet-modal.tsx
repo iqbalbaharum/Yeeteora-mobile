@@ -5,14 +5,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Zap, Percent } from 'lucide-react'
+// import { Zap, Percent } from 'lucide-react'
 
 interface YeetModalProps {
     children: React.ReactNode
     pairName: string
 }
-
-export function YeetModal({ children, pairName }: YeetModalProps) {
+export function YeetModal({ children }: YeetModalProps) {
+// export function YeetModal({ children, pairName }: YeetModalProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [yeetAmount, setYeetAmount] = useState('')
 
@@ -32,7 +32,7 @@ export function YeetModal({ children, pairName }: YeetModalProps) {
                 <div className="p-6">
                     <DialogHeader className="mb-6">
                         <DialogTitle className="text-2xl font-bold text-white text-center">
-                            Yeet'em
+                            Yeet`&apos;`em
                         </DialogTitle>
                     </DialogHeader>
 

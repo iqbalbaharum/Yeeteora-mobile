@@ -6,8 +6,8 @@ import { AppHeader } from '@/components/app-header'
 import { AppNavbar } from '@/components/app-navbar'
 import React from 'react'
 import { AppFooter } from '@/components/app-footer'
-import { ClusterChecker } from '@/components/cluster/cluster-ui'
-import { AccountChecker } from '@/components/account/account-ui'
+// import { ClusterChecker } from '@/components/cluster/cluster-ui'
+// import { AccountChecker } from '@/components/account/account-ui'
 
 export function AppLayout({
   children,
@@ -18,12 +18,12 @@ export function AppLayout({
 }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-      <div className="flex flex-col min-h-screen gradient-bg">
+      <div className="flex flex-col min-h-screen">
         <AppHeader />
-        <main className="flex-grow px-4 pb-24">
-          <ClusterChecker>
+        <main className="flex-grow pb-24">
+          {/* <ClusterChecker>
             <AccountChecker />
-          </ClusterChecker>
+          </ClusterChecker> */}
           {children}
         </main>
         <AppFooter />
