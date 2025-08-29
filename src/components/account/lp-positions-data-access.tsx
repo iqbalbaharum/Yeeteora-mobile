@@ -46,6 +46,8 @@ export type PositionType = {
 // Use the actual PositionInfo type from DLMM library
 export type LBPairPositionInfo = PositionInfo
 
+// Remove the utility function entirely - we don't need to log RPC URLs
+
 // Hook to get all LP positions for a wallet using the working sample pattern
 export function useGetLPPositions({ address }: { address: PublicKey }) {
   const { connection } = useConnection()
@@ -54,16 +56,15 @@ export function useGetLPPositions({ address }: { address: PublicKey }) {
     queryKey: ['get-lp-positions', { endpoint: connection.rpcEndpoint, address: address.toString() }],
     queryFn: async (): Promise<Map<string, PositionInfo>> => {
       try {
-        console.log('🚀 Starting LP position discovery...')
-        console.log(`🌐 RPC Endpoint: ${connection.rpcEndpoint}`)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🚀 Starting LP position discovery...')
+        }
         
         // Use custom RPC for heavy operations if available
         const customRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
           process.env.NEXT_PUBLIC_Custom_RPC_URL ||
           process.env.NEXT_PUBLIC_HEAVY_RPC_URL ||
           connection.rpcEndpoint
-        
-        console.log(`🔧 Using RPC for discovery: ${customRpcUrl}`)
         
         // Create optimized connection for heavy operations
         const discoveryConnection = customRpcUrl !== connection.rpcEndpoint
@@ -78,11 +79,15 @@ export function useGetLPPositions({ address }: { address: PublicKey }) {
         
         // Test connection first
         try {
-          console.log('🧪 Testing RPC connection...')
-          const version = await discoveryConnection.getVersion()
-          console.log('✅ RPC connection successful:', version)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🧪 Testing RPC connection...')
+          }
+          await discoveryConnection.getVersion()
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ RPC connection successful')
+          }
         } catch (rpcError: unknown) {
-          console.error('❌ RPC connection test failed:', rpcError)
+          console.error('❌ RPC connection test failed:', rpcError instanceof Error ? rpcError.message : 'Unknown RPC error')
           throw new Error(`RPC connection failed: ${rpcError instanceof Error ? rpcError.message : 'Unknown RPC error'}`)
         }
         
@@ -92,32 +97,43 @@ export function useGetLPPositions({ address }: { address: PublicKey }) {
           address
         )
         
-        console.log(`🎉 DISCOVERY COMPLETE! Found ${userPositions.size} position(s)`)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🎉 DISCOVERY COMPLETE! Found ${userPositions.size} position(s)`)
+        }
         
         return userPositions
         
       } catch (error: unknown) {
-        console.error('❌ LP position discovery failed:', error)
+        // Only log detailed error info in development
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ LP position discovery failed:', error)
+        }
         
         // Enhanced error handling and guidance
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         
         if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
-          console.error('💡 RPC Error Solution:')
-          console.error('   - Your RPC is blocking heavy operations (getProgramAccounts)')
-          console.error('   - Set NEXT_PUBLIC_SOLANA_RPC_URL in your .env.local file')
-          console.error('   - Use a paid RPC provider like Alchemy, QuickNode, or Helius')
+          if (process.env.NODE_ENV === 'development') {
+            console.error('💡 RPC Error Solution:')
+            console.error('   - Your RPC is blocking heavy operations (getProgramAccounts)')
+            console.error('   - Set NEXT_PUBLIC_SOLANA_RPC_URL in your .env.local file')
+            console.error('   - Use a paid RPC provider like Alchemy, QuickNode, or Helius')
+          }
         } else if (errorMessage.includes('timeout')) {
-          console.error('💡 Timeout Error Solution:')
-          console.error('   - Position discovery took longer than expected')
-          console.error('   - Try again in a few minutes')
-          console.error('   - Consider using a faster RPC provider')
+          if (process.env.NODE_ENV === 'development') {
+            console.error('💡 Timeout Error Solution:')
+            console.error('   - Position discovery took longer than expected')
+            console.error('   - Try again in a few minutes')
+            console.error('   - Consider using a faster RPC provider')
+          }
         } else if (errorMessage.includes('connection')) {
-          console.error('💡 Connection Error Solution:')
-          console.error('   - Check your internet connection')
-          console.error('   - Verify your RPC URL is correct')
-          console.error('   - Try switching to a different RPC endpoint')
-        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('💡 Connection Error Solution:')
+            console.error('   - Check your internet connection')
+            console.error('   - Verify your RPC URL is correct')
+            console.error('   - Try switching to a different RPC endpoint')
+          }
+        } else if (process.env.NODE_ENV === 'development') {
           console.error(`💡 Unexpected Error: ${errorMessage}`)
           console.error('   - This might be a temporary issue')
           console.error('   - Try refreshing the page')
@@ -133,20 +149,28 @@ export function useGetLPPositions({ address }: { address: PublicKey }) {
       
       // Don't retry certain errors that won't resolve with retries
       if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
-        console.log('❌ Not retrying 403 errors - RPC configuration issue')
+        if (process.env.NODE_ENV === 'development') {
+          console.log('❌ Not retrying 403 errors - RPC configuration issue')
+        }
         return false
       }
       if (errorMessage.includes('connection')) {
-        console.log('❌ Not retrying connection errors - check RPC URL')
+        if (process.env.NODE_ENV === 'development') {
+          console.log('❌ Not retrying connection errors - check RPC URL')
+        }
         return false
       }
       
-      console.log(`🔄 Retrying position discovery... (attempt ${failureCount + 1}/3)`)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🔄 Retrying position discovery... (attempt ${failureCount + 1}/3)`)
+      }
       return failureCount < 2
     },
     retryDelay: (attemptIndex) => {
       const delay = Math.min(1000 * 2 ** attemptIndex, 30000)
-      console.log(`⏳ Waiting ${delay}ms before retry...`)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`⏳ Waiting ${delay}ms before retry...`)
+      }
       return delay
     },
     refetchOnWindowFocus: false, // Don't refetch on window focus to avoid excessive API calls
@@ -207,7 +231,13 @@ export function usePositionActions(
         refreshPositions()
       }, 10000)
     } catch (err) {
-      toast.error("Failed to close position: " + (err as Error).message)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      toast.error("Failed to close position: " + errorMessage)
+      
+      // Only log detailed error in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Close position error:', err)
+      }
     } finally {
       setClosing(false)
     }
@@ -254,7 +284,13 @@ export function usePositionActions(
         toast.error("You don't have any fees to claim.")
       }
     } catch (err) {
-      toast.error("Failed to claim fees: " + (err as Error).message)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      toast.error("Failed to claim fees: " + errorMessage)
+      
+      // Only log detailed error in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Claim fees error:', err)
+      }
     } finally {
       setClaiming(false)
     }
@@ -268,4 +304,3 @@ export function usePositionActions(
     publicKey,
   }
 }
-
