@@ -1,93 +1,101 @@
 // src/components/damm-v2/damm-v2-token-card.tsx
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 export interface TokenData {
-  mint: string;
-  delta_other: number;
-  delta_jup: number;
-  total: number;
-  total_jupiter: number;
-  jupiter_pct: number;
-  is_new_entry: boolean;
-  timestamp: number;
+  mint: string
+  delta_other: number
+  delta_jup: number
+  total: number
+  total_jupiter: number
+  jupiter_pct: number
+  is_new_entry: boolean
+  since_tge: number
+  timestamp: number
 }
 
 interface TokenCardProps {
-  token: TokenData;
+  token: TokenData
 }
 
 export function TokenCard({ token }: TokenCardProps) {
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleTimeString();
-  };
+  // const formatTimestamp = (timestamp: number) => {
+  //   const date = new Date(timestamp * 1000)
+  //   return date.toLocaleTimeString()
+  // }
+
+  const handleOpenGMGN = () => {
+    window.open(`https://gmgn.ai/sol/token/${token.mint}`, '_blank')
+  }
+
+  const handleOpenMeteora = () => {
+    window.open(`https://meteora.ag/dammv2/${token.mint}`, '_blank')
+  }
+
+  const handlePumpSwap = () => {
+    window.open(
+      `https://swap.pump.fun/?input=So11111111111111111111111111111111111111112&output=${token.mint}`,
+      '_blank',
+    )
+  }
+
+  const totalDelta = token.delta_jup + token.delta_other
+  let bgColorClass = 'bg-[#2a2a3e]/50 text-white' // default
+
+  if (token.delta_jup > 20 && totalDelta > 200) {
+    bgColorClass = 'bg-red-400/25 text-white' // 🔥 intense red
+  } else if (token.delta_jup > 10 && totalDelta > 100) {
+    bgColorClass = 'bg-yellow-400/25 text-white' // ⚠️ yellow, better contrast with black text
+  }
+
+  const ageInSeconds = token.since_tge
+  const formattedTime = ageInSeconds < 60 ? `${ageInSeconds}s` : `${Math.floor(ageInSeconds / 60)}m`
 
   return (
-    <Card className="bg-[#2a2a3e] border-0 text-white">
+    <Card className={`${bgColorClass} border-0`}>
       <CardHeader className="flex flex-row items-center">
-        <div className="w-12 h-12 bg-gray-500 rounded-full mr-4" />
         <div className="flex-1">
-          <CardTitle className="text-lg font-bold truncate">{token.mint}</CardTitle>
-          <div className="flex items-center text-xs text-gray-400">
-            <span>-</span>
-            <span className="mx-2">|</span>
-            <span>CA</span>
-            <span className="mx-2">|</span>
-            <span>-</span>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-green-400">-</div>
-          <div className="text-sm">-</div>
+          <CardTitle className="text-sm font-bold truncate">
+            {token.mint} <span className="text-xs text-gray-400">{formattedTime}</span>
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <div className="text-gray-400">Market Cap</div>
-          <div>-</div>
+          <div className="text-gray-400">Changes Jupiter</div>
+          <div className="text-lg text-green-500">+{token.delta_jup}</div>
         </div>
         <div>
-          <div className="text-gray-400">Liquidity</div>
-          <div>-</div>
+          <div className="text-gray-400">Changes Non-Jupiter</div>
+          <div className="text-lg">+{token.delta_other}</div>
         </div>
         <div>
-          <div className="text-gray-400">5m Vol</div>
-          <div>-</div>
+          <div className="text-gray-400">Jupiter Txs Pct</div>
+          <div className="text-lg text-green-500">{token.jupiter_pct.toFixed(2)}%</div>
         </div>
-        <div>
-          <div className="text-gray-400">Net Buy/Sell</div>
-          <div className="text-green-400">-</div>
-        </div>
+        <div></div>
         <div>
           <div className="text-gray-400">Total Jupiter Txs</div>
           <div>{token.total_jupiter}</div>
         </div>
         <div>
-          <div className="text-gray-400">Total Other Txs</div>
+          <div className="text-gray-400">Total Non-Jupiter Txs</div>
           <div>{token.total}</div>
-        </div>
-        <div>
-          <div className="text-gray-400">Delta Jupiter Txs</div>
-          <div>{token.delta_jup}</div>
-        </div>
-        <div>
-          <div className="text-gray-400">Delta Other Txs</div>
-          <div>{token.delta_other}</div>
-        </div>
-        <div>
-          <div className="text-gray-400">Jupiter Pct</div>
-          <div>{token.jupiter_pct.toFixed(2)}%</div>
         </div>
       </CardContent>
       <CardFooter className="flex flex-col gap-2">
         <div className="flex gap-2 w-full">
-          <Button className="flex-1 bg-[#4a4a6e] hover:bg-[#5a5a7e]">GMGN</Button>
-          <Button className="flex-1 bg-[#4a4a6e] hover:bg-[#5a5a7e]">Axiom</Button>
-          <Button className="flex-1 bg-[#4a4a6e] hover:bg-[#5a5a7e]">Cleopatra</Button>
+          <Button className="flex-1 bg-[#4a4a6e] hover:bg-[#5a5a7e]" onClick={handleOpenGMGN}>
+            GMGN
+          </Button>
+          <Button className="flex-1 bg-[#4a4a6e] hover:bg-[#5a5a7e]" onClick={handlePumpSwap}>
+            SWAP
+          </Button>
         </div>
-        <Button className="w-full bg-[#4a4a6e] hover:bg-[#5a5a7e]">Check DAMM V2 Pools</Button>
+        <Button className="w-full bg-primary hover:bg-secondary" onClick={handleOpenMeteora}>
+          Meteora DAMM V2
+        </Button>
       </CardFooter>
     </Card>
-  );
+  )
 }
