@@ -1,6 +1,6 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Trophy, Wallet} from 'lucide-react'
+import { TrendingUp, Trophy, Wallet, Zap} from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface NavbarProps {
@@ -21,16 +21,29 @@ export function AppNavbar({ links }: NavbarProps) {
         return path === '/' ? pathname === '/' : pathname.startsWith(path)
     }
 
+    const getPageTag = (label: string) => {
+        switch (label) {
+            case 'Home':
+                return 'DLMM'
+            case 'Damm v2':
+                return 'DAMM V2'
+            case 'Account':
+                return 'WALLET'
+            default:
+                return label.toUpperCase()
+        }
+    }
+
     const getIcon = (label: string) => {
         switch (label) {
             case 'Home':
-                return <Home className="w-5 h-5" />
-            // case 'Meteora':
-            //     return <TrendingUp className="w-5 h-5" />
+                return                                 <TrendingUp className="w-4 h-4" />
+            case 'Damm v2':
+                return <Zap className="w-4 h-4" />
             case 'Account':
-                return <Wallet className="w-5 h-5" />
+                return <Wallet className="w-4 h-4" />
             case 'Ranking':
-                return <Trophy className="w-5 h-5" />
+                return <Trophy className="w-4 h-4" />
             case 'Portfolio':
                 return <Wallet className="w-5 h-5" />
             default:
@@ -46,19 +59,22 @@ export function AppNavbar({ links }: NavbarProps) {
         return (
             <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
                 <nav className="relative">
-                    <div className="flex items-center gap-3 px-3 py-2.5 bg-[#1a1b1e]/90 rounded-full border border-white/5">
+                    <div className="flex items-center gap-1.5 px-1.5 py-1 bg-[#1a1b1e]/90 rounded-2xl border border-white/5">
                         {links.map(({ label, path }) => (
                             <button
                                 key={path}
-                                className="relative p-2.5 rounded-full transition-all duration-300 text-white/50"
+                                className="relative flex flex-col items-center gap-0.5 px-2 py-1 transition-all duration-300 text-white/50"
                             >
                                 <div className="relative z-10">
                                     {getIcon(label)}
                                 </div>
+                                <span className="text-[10px] font-serif text-white/40">
+                                    {getPageTag(label)}
+                                </span>
                             </button>
                         ))}
                     </div>
-                    <div className="absolute -inset-[0.5px] bg-gradient-to-t from-white/10 to-transparent rounded-full pointer-events-none" />
+                    <div className="absolute -inset-[0.5px] bg-gradient-to-t from-white/10 to-transparent rounded-2xl pointer-events-none" />
                 </nav>
             </div>
         )
@@ -74,14 +90,17 @@ export function AppNavbar({ links }: NavbarProps) {
                             <button
                                 key={path}
                                 onClick={() => handleNavigation(path)}
-                                className={`relative p-2.5 rounded-full transition-all duration-300 ${active
-                                    ? 'bg-primary text-white'
+                                className={`relative flex flex-col items-center gap-0.5 px-2 py-1 transition-all duration-300 ${active
+                                    ? 'bg-primary text-white rounded-2xl'
                                     : 'text-white/50 hover:text-white/80'
                                     }`}
                             >
                                 <div className="relative z-10">
                                     {getIcon(label)}
                                 </div>
+                                <span className={`text-[10px] font-serif transition-all duration-300 ${active ? 'text-white' : 'text-white/40'}`}>
+                                    {getPageTag(label)}
+                                </span>
                             </button>
                         )
                     })}

@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AppProviders } from '@/components/app-providers'
@@ -24,9 +25,8 @@ export const viewport: Viewport = {
 }
 
 const links: { label: string; path: string }[] = [
-  // More links...
   { label: 'Home', path: '/' },
-  { label: 'Meteora', path: '/meteora' },
+  { label: 'Damm v2', path: '/damm-v2' },
   { label: 'Account', path: '/account' },
 ]
 
@@ -41,6 +41,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   )
 }
+
 // Patch BigInt so we can log it using JSON.stringify without any errors
 declare global {
   interface BigInt {
