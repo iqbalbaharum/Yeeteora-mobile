@@ -5,7 +5,7 @@ export default function MeteoraFeature() {
   return (
     <div className="min-h-screen">
       <AppHero
-        title="LP Strategies"
+        title="Alpha call DLMM"
         subtitle="Discover and provide liquidity for high-performing DLMM pairs"
       />
 
