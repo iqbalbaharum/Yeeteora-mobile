@@ -2,7 +2,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
 import { AppHero } from '@/components/app-hero';
 import { TokenCard, TokenData } from './damm-v2-token-card';
 import { NewTokenPopup } from './damm-v2-new-token-popup';
@@ -13,13 +12,14 @@ export default function DammV2Feature() {
   const [isPopupOpen, setPopupOpen] = useState(false);
 
   useEffect(() => {
-    const socket = io('wss://comet.lyt.wtf/ws');
+    const ws = new WebSocket('wss://comet.lyt.wtf/ws');
 
-    socket.on('connect', () => {
+    ws.onopen = () => {
       console.log('connected to websocket');
-    });
+    };
 
-    socket.on('message', (data: TokenData) => {
+    ws.onmessage = (event) => {
+      const data: TokenData = JSON.parse(event.data);
       setTokens((prevTokens) => ({
         ...prevTokens,
         [data.mint]: data,
@@ -29,14 +29,18 @@ export default function DammV2Feature() {
         setNewToken(data);
         setPopupOpen(true);
       }
-    });
+    };
 
-    socket.on('disconnect', () => {
+    ws.onclose = () => {
       console.log('disconnected from websocket');
-    });
+    };
+
+    ws.onerror = (error) => {
+      console.error('websocket error:', error);
+    };
 
     return () => {
-      socket.disconnect();
+      ws.close();
     };
   }, []);
 
