@@ -12,6 +12,10 @@ export interface TokenData {
   total_jupiter: number
   jupiter_pct: number
   is_new_entry: boolean
+  total_trade_size: number
+  delta_total_trade_size: number
+  delta_jupiter_trade_size: number
+  jupiter_trade_size: number
   since_tge: number
   timestamp: number
 }
@@ -100,11 +104,15 @@ export function TokenCard({ token }: TokenCardProps) {
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <div className="text-gray-400">Changes Jupiter</div>
-            <div className="text-lg text-green-500">+{token.delta_jup}</div>
+            <div className="text-lg text-green-500">
+              +{token.delta_jup} ({(token.delta_jupiter_trade_size / 1_000_000_000).toFixed(2)} SOL)
+            </div>
           </div>
           <div>
             <div className="text-gray-400">Changes Non-Jupiter</div>
-            <div className="text-lg">+{token.delta_other}</div>
+            <div className="text-lg">
+              +{token.delta_other} ({(token.delta_total_trade_size / 1_000_000_000).toFixed(2)} SOL)
+            </div>
           </div>
           <div>
             <div className="text-gray-400">Jupiter Txs Pct</div>
