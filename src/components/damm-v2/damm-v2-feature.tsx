@@ -1,16 +1,41 @@
 // src/components/damm-v2/damm-v2-feature.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppHero } from '@/components/app-hero'
 import { TokenCard, TokenData } from './damm-v2-token-card'
 import { NewTokenPopup } from './damm-v2-new-token-popup'
 import { Button } from '../ui/button'
 
+const EXPIRY_MS = 2 * 60 * 1000
+
 export default function DammV2Feature() {
   const [tokens, setTokens] = useState<Record<string, TokenData>>({})
   const [newToken, setNewToken] = useState<TokenData | null>(null)
   const [isPopupOpen, setPopupOpen] = useState(false)
+
+  const expiryTimers = useRef<Record<string, NodeJS.Timeout>>({})
+
+  const addOrUpdateToken = (data: TokenData) => {
+    setTokens((prevTokens) => ({
+      ...prevTokens,
+      [data.mint]: data,
+    }))
+
+    // Reset expiry timer for this token
+    if (expiryTimers.current[data.mint]) {
+      clearTimeout(expiryTimers.current[data.mint])
+    }
+
+    expiryTimers.current[data.mint] = setTimeout(() => {
+      setTokens((prevTokens) => {
+        const updated = { ...prevTokens }
+        delete updated[data.mint]
+        return updated
+      })
+      delete expiryTimers.current[data.mint]
+    }, EXPIRY_MS)
+  }
 
   useEffect(() => {
     const ws = new WebSocket('wss://comet.lyt.wtf/ws')
@@ -21,10 +46,7 @@ export default function DammV2Feature() {
 
     ws.onmessage = (event) => {
       const data: TokenData = JSON.parse(event.data)
-      setTokens((prevTokens) => ({
-        ...prevTokens,
-        [data.mint]: data,
-      }))
+      addOrUpdateToken(data)
 
       if (data.is_new_entry) {
         setNewToken(data)
@@ -42,6 +64,7 @@ export default function DammV2Feature() {
 
     return () => {
       ws.close()
+      Object.values(expiryTimers.current).forEach(clearTimeout)
     }
   }, [])
 
