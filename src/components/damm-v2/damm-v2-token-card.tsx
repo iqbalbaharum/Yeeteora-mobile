@@ -118,7 +118,12 @@ export function TokenCard({ token }: TokenCardProps) {
             <div className="text-gray-400">Jupiter Txs Pct</div>
             <div className="text-lg text-green-500">{token.jupiter_pct.toFixed(2)}%</div>
           </div>
-          <div></div>
+          <div>
+            <div className="text-gray-400">Jupiter Size Pct</div>
+            <div className="text-lg text-green-500">
+              {((token.delta_jupiter_trade_size / token.delta_total_trade_size) * 100).toFixed(2)}%
+            </div>
+          </div>
           <div>
             <div className="text-gray-400">Total Jupiter Txs</div>
             <div>{token.total_jupiter}</div>
