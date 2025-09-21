@@ -16,7 +16,7 @@ export interface TokenData {
   delta_total_trade_size: number
   delta_jupiter_trade_size: number
   jupiter_trade_size: number
-  since_tge: number
+  tge_at: number
   timestamp: number
 }
 
@@ -82,7 +82,7 @@ export function TokenCard({ token }: TokenCardProps) {
     triggerAlert('⚠️ Medium Jupiter Activity')
   }
 
-  const ageInSeconds = token.since_tge
+  const ageInSeconds = token.timestamp - token.tge_at
   const formattedTime = ageInSeconds < 60 ? `${ageInSeconds}s` : `${Math.floor(ageInSeconds / 60)}m`
 
   return (
