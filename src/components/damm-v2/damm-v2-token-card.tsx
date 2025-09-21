@@ -1,6 +1,7 @@
 // src/components/damm-v2/damm-v2-token-card.tsx
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useEffect, useRef } from 'react'
 
 export interface TokenData {
   mint: string
@@ -19,10 +20,13 @@ interface TokenCardProps {
 }
 
 export function TokenCard({ token }: TokenCardProps) {
-  // const formatTimestamp = (timestamp: number) => {
-  //   const date = new Date(timestamp * 1000)
-  //   return date.toLocaleTimeString()
-  // }
+  const lastNotificationRef = useRef<number>(0)
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission !== 'granted') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   const handleOpenGMGN = () => {
     window.open(`https://gmgn.ai/sol/token/${token.mint}`, '_blank')
@@ -30,6 +34,30 @@ export function TokenCard({ token }: TokenCardProps) {
 
   const handleOpenMeteora = () => {
     window.open(`https://meteora.ag/dammv2/${token.mint}`, '_blank')
+  }
+
+  const playNotificationSound = () => {
+    const audio = new Audio('/sound/noti.mp3')
+    audio.play().catch((err) => console.error('Failed to play sound:', err))
+  }
+
+  const showBrowserNotification = (title: string, body: string) => {
+    console.log(Notification.permission)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body })
+    }
+  }
+
+  const triggerAlert = (title: string) => {
+    const now = Date.now()
+    if (now - lastNotificationRef.current > 3000) {
+      playNotificationSound()
+      showBrowserNotification(
+        title,
+        `${token.mint} — Jup: ${token.delta_jup}, Total: ${token.total + token.total_jupiter}`,
+      )
+      lastNotificationRef.current = now
+    }
   }
 
   const handlePumpSwap = () => {
@@ -44,8 +72,10 @@ export function TokenCard({ token }: TokenCardProps) {
 
   if (token.delta_jup > 20 && totalDelta > 200) {
     bgColorClass = 'bg-red-400/25 text-white' // 🔥 intense red
+    triggerAlert('🚨 High Jupiter Activity!')
   } else if (token.delta_jup > 10 && totalDelta > 100) {
     bgColorClass = 'bg-yellow-400/25 text-white' // ⚠️ yellow, better contrast with black text
+    triggerAlert('⚠️ Medium Jupiter Activity')
   }
 
   const ageInSeconds = token.since_tge
