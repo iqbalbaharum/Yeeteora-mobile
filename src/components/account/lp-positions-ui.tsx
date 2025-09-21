@@ -1,7 +1,7 @@
 // src/components/account/lp-positions-ui.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { RangeBar } from "./RangeBar";
@@ -24,13 +24,17 @@ const tokenMetaCache: Record<string, TokenMeta> = {};
 
 async function fetchTokenMeta(mint: string) {
   if (tokenMetaCache[mint]) return tokenMetaCache[mint];
-  const res = await fetch(
-    `https://lite-api.jup.ag/tokens/v2/search?query=${mint}`
-  );
-  const data = await res.json();
-  const token = data[0];
-  tokenMetaCache[mint] = token;
-  return token;
+  
+  try {
+    const res = await fetch(`https://lite-api.jup.ag/tokens/v2/search?query=${mint}`);
+    const data = await res.json();
+    const token = data[0];
+    tokenMetaCache[mint] = token;
+    return token;
+  } catch (error) {
+    console.error('Error fetching token metadata:', error);
+    return null;
+  }
 }
 
 // Helper to format balance with dynamic superscript for leading zeros after decimal
@@ -75,6 +79,7 @@ type MaybeBase58 = { toBase58?: () => string };
 function useTokenMeta(pool: PoolWithActiveId) {
   const [tokenXMeta, setTokenXMeta] = React.useState<TokenMeta | null>(null);
   const [tokenYMeta, setTokenYMeta] = React.useState<TokenMeta | null>(null);
+  
   React.useEffect(() => {
     if (!pool) return;
     const xMint = pool.tokenXMint && typeof (pool.tokenXMint as MaybeBase58).toBase58 === 'function'
@@ -83,9 +88,15 @@ function useTokenMeta(pool: PoolWithActiveId) {
     const yMint = pool.tokenYMint && typeof (pool.tokenYMint as MaybeBase58).toBase58 === 'function'
       ? (pool.tokenYMint as MaybeBase58).toBase58!()
       : pool.tokenYMint;
-    fetchTokenMeta(xMint as string).then(setTokenXMeta);
-    fetchTokenMeta(yMint as string).then(setTokenYMeta);
+    
+    if (xMint) {
+      fetchTokenMeta(xMint as string).then(setTokenXMeta);
+    }
+    if (yMint) {
+      fetchTokenMeta(yMint as string).then(setTokenYMeta);
+    }
   }, [pool]);
+  
   return { tokenXMeta, tokenYMeta };
 }
 
@@ -277,9 +288,6 @@ function PositionItem({
               ? `${tokenXMeta.symbol} / ${tokenYMeta.symbol}`
               : "Loading..."}
           </div>
-          {/* <div className="text-sm text-muted-foreground font-serif">
-            {lbPairAddress.slice(0, 8)}...{lbPairAddress.slice(-8)}
-          </div> */}
           {getPositionStrategy() && (
             <div className="mt-1">
               <div className="text-primary font-medium font-serif text-xs bg-secondary-foreground px-2 py-1 rounded-[8px] inline-block">
@@ -378,7 +386,6 @@ function PositionItem({
     </>
   );
 
-
   // Return the new Meteora-style layout regardless of viewMode
   return (
     <>
@@ -461,7 +468,6 @@ function PositionItem({
                 {claiming ? "CLAIMING..." : "CLAIM FEES"}
               </Button>
               <Button
-                
                 onClick={handleCloseAndWithdraw}
                 disabled={closing || !publicKey}
               >
@@ -511,9 +517,6 @@ function PositionItem({
                     ? `${tokenXMeta.symbol} / ${tokenYMeta.symbol}`
                     : "Loading..."}
                 </div>
-                {/* <div className="text-xs text-muted-foreground font-serif">
-                  {lbPairAddress.slice(0, 8)}...{lbPairAddress.slice(-8)}
-                </div> */}
               </div>
             </div>
             {getPositionStrategy() && (
@@ -581,15 +584,38 @@ function PositionItem({
 
 export function LPPositions({ address }: LPPositionsProps) {
   const { connected, connecting } = useWallet();
-  const query = useGetLPPositions({ address });
-  // Remove the old viewMode since we're using the new unified layout
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Ensure component is mounted before running queries
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Only run query when mounted and connected
+  const query = useGetLPPositions({ 
+    address: isMounted && connected ? address : new PublicKey('11111111111111111111111111111111111111111')
+  });
 
   const refreshPositions = () => {
-    query.refetch();
+    if (isMounted && connected) {
+      query.refetch();
+    }
   };
 
   // Convert Map to Array for rendering
   const positionsArray = query.data ? Array.from(query.data.entries()) : [];
+
+  // Don't render anything until mounted
+  if (!isMounted) {
+    return (
+      <div className="lg:px-[70px] px-4 mx-auto space-y-12">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Your Positions</h1>
+          <span className="text-sm text-muted-foreground">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lg:px-[70px] px-4 mx-auto space-y-12">
@@ -687,6 +713,5 @@ export function LPPositions({ address }: LPPositionsProps) {
           </div>
         )}
       </div>
-    
   );
 }

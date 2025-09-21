@@ -1,4 +1,3 @@
-// src/components/damm-v2/damm-v2-new-token-popup.tsx
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TokenData, TokenCard } from './damm-v2-token-card'
 
@@ -15,11 +14,18 @@ export function NewTokenPopup({ token, open, onOpenChange }: NewTokenPopupProps)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#2a2a3e] border-0 text-white">
-        <DialogHeader>
-          <DialogTitle>New Signal!</DialogTitle>
+      <DialogContent className="bg-[#2a2a3e] border-0 text-white max-w-md w-[95vw] mx-auto p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-4 pb-2 border-b border-gray-600/30">
+          <DialogTitle className="text-lg font-bold text-center text-white flex items-center justify-center gap-2">
+            🚨 New Signal!
+          </DialogTitle>
         </DialogHeader>
-        <TokenCard token={token} />
+        <div className="p-4 max-h-[80vh] overflow-y-auto">
+          {/* Create a wrapper div that constrains the TokenCard */}
+          <div className="w-full">
+            <TokenCard token={token} />
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
