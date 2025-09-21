@@ -5,24 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppHero } from '@/components/app-hero'
 import { NewTokenPopup } from './damm-v2-new-token-popup'
 import { Button } from '../ui/button'
-import dynamic from 'next/dynamic'
-
-// Dynamically import TokenCard to prevent SSR issues
-const TokenCard = dynamic(
-  () => import('./damm-v2-token-card').then(mod => ({ default: mod.TokenCard })),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="bg-[#2a2a3e]/50 border-0 rounded-lg p-4 animate-pulse">
-        <div className="h-4 bg-gray-600 rounded mb-4"></div>
-        <div className="space-y-2">
-          <div className="h-3 bg-gray-600 rounded"></div>
-          <div className="h-3 bg-gray-600 rounded w-3/4"></div>
-        </div>
-      </div>
-    )
-  }
-)
+import { TokenCard } from './damm-v2-token-card'
 
 export interface TokenData {
   mint: string

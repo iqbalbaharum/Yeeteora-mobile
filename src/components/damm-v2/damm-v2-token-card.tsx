@@ -3,6 +3,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
+import { Copy } from 'lucide-react'
+import { toast } from 'sonner'
 
 export interface TokenData {
   mint: string
@@ -67,6 +69,17 @@ export function TokenCard({ token }: TokenCardProps) {
   const [tokenName, setTokenName] = useState<string | null>(null)
   const [isLoadingTokenName, setIsLoadingTokenName] = useState(false)
 
+  // Copy address to clipboard function
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Address copied to clipboard!')
+    } catch (err) {
+      console.error('Failed to copy: ', err)
+      toast.error('Failed to copy address')
+    }
+  }
+
   // Utility functions
   const formatTVL = (tvl: number) => {
     if (tvl >= 1000000) {
@@ -88,27 +101,6 @@ export function TokenCard({ token }: TokenCardProps) {
   }
 
   const formatTime = (ageInSeconds: number) => {
-    // Handle invalid/corrupted timestamps
-    // If the value is too large (more than 2 years = 63,072,000 seconds), it's likely a Unix timestamp
-    if (ageInSeconds > 63072000) {
-      // Try to convert from Unix timestamp to age
-      const currentTime = Math.floor(Date.now() / 1000) // Current Unix timestamp
-      const actualAge = currentTime - ageInSeconds
-      
-      // If the result is still invalid or negative, show "Unknown"
-      if (actualAge <= 0 || actualAge > 63072000) {
-        return "Unknown"
-      }
-      
-      // Use the corrected age
-      ageInSeconds = actualAge
-    }
-    
-    // If still invalid (negative or too large), show "Unknown"
-    if (ageInSeconds <= 0 || ageInSeconds > 63072000) {
-      return "Unknown"
-    }
-    
     if (ageInSeconds < 60) {
       return `${ageInSeconds}s`
     } else if (ageInSeconds < 3600) {
@@ -422,6 +414,14 @@ export function TokenCard({ token }: TokenCardProps) {
                   </span>
                   <span className="text-gray-400 text-xs">•</span>
                   <span className="text-xs text-gray-400 truncate">{token.mint}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(token.mint)}
+                    className="h-6 w-6 p-0 hover:bg-gray-600/50"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
                 </div>
               </CardTitle>
               <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
