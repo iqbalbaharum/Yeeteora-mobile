@@ -46,8 +46,6 @@ export type PositionType = {
 // Use the actual PositionInfo type from DLMM library
 export type LBPairPositionInfo = PositionInfo
 
-// Remove the utility function entirely - we don't need to log RPC URLs
-
 // Hook to get all LP positions for a wallet using the working sample pattern
 export function useGetLPPositions({ address }: { address: PublicKey }) {
   const { connection } = useConnection()
@@ -174,6 +172,7 @@ export function useGetLPPositions({ address }: { address: PublicKey }) {
       return delay
     },
     refetchOnWindowFocus: false, // Don't refetch on window focus to avoid excessive API calls
+    enabled: !!address, // Only run when address is available
   })
 }
 

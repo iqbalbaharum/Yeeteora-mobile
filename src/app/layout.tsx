@@ -1,9 +1,8 @@
-// src/app/layout.tsx
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AppProviders } from '@/components/app-providers'
-import { AppLayout } from '@/components/app-layout'
 import React from 'react'
+import { AppLayout } from '@/components/app-layout'
 
 export const metadata: Metadata = {
   title: 'Yeeteora - LP Strategies',
