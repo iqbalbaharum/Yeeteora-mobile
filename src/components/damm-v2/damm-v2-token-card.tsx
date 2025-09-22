@@ -1,4 +1,3 @@
-// src/components/damm-v2/damm-v2-token-card.tsx
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
@@ -22,7 +21,7 @@ export interface TokenData {
   timestamp: number
 }
 
-// Jupiter Token API types (based on actual API response)
+// Jupiter Token API response type
 interface JupiterTokenData {
   id: string
   name: string
@@ -127,21 +126,11 @@ export function TokenCard({ token }: TokenCardProps) {
   // Utility functions
   const formatTVL = (tvl: number) => {
     if (tvl >= 1000000) {
-      return `$${(tvl / 1000000).toFixed(2)}M`
+      return `${(tvl / 1000000).toFixed(2)}M`
     } else if (tvl >= 1000) {
-      return `$${(tvl / 1000).toFixed(2)}K`
+      return `${(tvl / 1000).toFixed(2)}K`
     } else {
-      return `$${tvl.toFixed(2)}`
-    }
-  }
-
-  const formatLargeNumber = (num: number) => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`
-    } else if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`
-    } else {
-      return num.toString()
+      return `${tvl.toFixed(2)}`
     }
   }
 
@@ -159,25 +148,25 @@ export function TokenCard({ token }: TokenCardProps) {
       return `${ageInSeconds}s`
     } else if (ageInSeconds < 3600) {
       return `${Math.floor(ageInSeconds / 60)}m`
-    } else if (ageInSeconds < 86400) {
+    } else {
       const hours = Math.floor(ageInSeconds / 3600)
       const minutes = Math.floor((ageInSeconds % 3600) / 60)
       return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
-    } else {
-      const days = Math.floor(ageInSeconds / 86400)
-      const hours = Math.floor((ageInSeconds % 86400) / 3600)
-      return hours > 0 ? `${days}d ${hours}h` : `${days}d`
     }
   }
 
-  // Jupiter Token Data API integration (includes organic score)
+  // Fixed Jupiter Token Data API integration using the correct endpoint
   const fetchJupiterTokenData = async (tokenMint: string): Promise<JupiterTokenData | null> => {
     try {
       setIsLoadingJupiterData(true)
       setJupiterDataError(null)
       
-      // Use the correct Jupiter API endpoint for token data
-      const response = await fetch(`https://api.jup.ag/tokens/v1/${tokenMint}`)
+      // Use the correct Jupiter Lite API endpoint
+      const response = await fetch(`https://lite-api.jup.ag/tokens/v2/search?query=${tokenMint}`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -189,9 +178,9 @@ export function TokenCard({ token }: TokenCardProps) {
         }
       }
       
-      const data: JupiterTokenData[] = await response.json()
+      const data = await response.json()
       
-      // API returns an array, get the first (and should be only) result
+      // API returns an array, get the first result since we're searching by exact mint
       if (Array.isArray(data) && data.length > 0) {
         return data[0]
       }
@@ -202,103 +191,33 @@ export function TokenCard({ token }: TokenCardProps) {
       console.error('Error fetching Jupiter token data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       setJupiterDataError(errorMessage)
-      
-      // For development/testing purposes, return mock data
-      if (process.env.NODE_ENV === 'development') {
-        return {
-          id: tokenMint,
-          name: 'Unknown Token',
-          symbol: 'UNK',
-          icon: '',
-          decimals: 6,
-          dev: '',
-          circSupply: 1000000,
-          totalSupply: 1000000,
-          holderCount: Math.floor(Math.random() * 1000) + 100,
-          organicScore: Math.floor(Math.random() * 100),
-          organicScoreLabel: 'medium',
-          fdv: Math.floor(Math.random() * 1000000) + 50000,
-          mcap: Math.floor(Math.random() * 1000000) + 50000,
-          usdPrice: Math.random() * 0.01,
-          liquidity: Math.floor(Math.random() * 100000) + 10000,
-          stats24h: {
-            priceChange: (Math.random() - 0.5) * 200,
-            holderChange: (Math.random() - 0.5) * 100,
-            liquidityChange: (Math.random() - 0.5) * 50,
-            buyVolume: Math.floor(Math.random() * 500000) + 10000,
-            sellVolume: Math.floor(Math.random() * 500000) + 10000,
-            buyOrganicVolume: Math.floor(Math.random() * 100000) + 5000,
-            sellOrganicVolume: Math.floor(Math.random() * 100000) + 5000,
-            numBuys: Math.floor(Math.random() * 1000) + 100,
-            numSells: Math.floor(Math.random() * 1000) + 100,
-            numTraders: Math.floor(Math.random() * 500) + 50,
-            numOrganicBuyers: Math.floor(Math.random() * 100) + 20,
-            numNetBuyers: Math.floor(Math.random() * 200) + 50
-          },
-          updatedAt: new Date().toISOString()
-        }
-      }
-      
       return null
     } finally {
       setIsLoadingJupiterData(false)
     }
   }
 
-  // Get organic score quality indicator (score-based only)
-  const getOrganicScoreQuality = (score: number) => {
-    if (score >= 70) {
-      return {
-        label: 'High',
-        color: 'text-green-400',
-        bgColor: 'bg-green-500/20',
-        borderColor: 'border-green-500/30',
-        icon: <TrendingUp className="w-3 h-3" />
-      }
-    } else if (score >= 40) {
-      return {
-        label: 'Medium',
-        color: 'text-blue-400',
-        bgColor: 'bg-blue-500/20',
-        borderColor: 'border-blue-500/30',
-        icon: <Users className="w-3 h-3" />
-      }
-    } else {
-      return {
-        label: 'Low',
-        color: 'text-red-400',
-        bgColor: 'bg-red-500/20',
-        borderColor: 'border-red-500/30',
-        icon: <AlertTriangle className="w-3 h-3" />
-      }
-    }
-  }
-
-  // Get ticker name from Jupiter API
+  // Simplified token name fetching using the correct Jupiter API
   const fetchTokenName = async (tokenMint: string): Promise<string | null> => {
     try {
       setIsLoadingTokenName(true)
-      const response = await fetch(`https://lite-api.jup.ag/tokens/v2/search?query=${tokenMint}`)
+      
+      const response = await fetch(`https://lite-api.jup.ag/tokens/v2/search?query=${tokenMint}`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
       
       if (!response.ok) {
-        throw new Error('Failed to fetch token data from Jupiter')
+        throw new Error('Failed to fetch from Jupiter API')
       }
       
       const data = await response.json()
       
-      // Jupiter API returns an array of tokens, find exact match
+      // API returns an array, get the first result since we're searching by exact mint
       if (Array.isArray(data) && data.length > 0) {
-        // Look for exact mint match first
-        const exactMatch = data.find((token: { address: string; symbol?: string }) => token.address === tokenMint)
-        if (exactMatch && exactMatch.symbol) {
-          return exactMatch.symbol
-        }
-        
-        // If no exact match, use the first result with a symbol
-        const firstWithSymbol = data.find((token: { symbol?: string }) => token.symbol)
-        if (firstWithSymbol && firstWithSymbol.symbol) {
-          return firstWithSymbol.symbol
-        }
+        const token = data[0]
+        return token.symbol || null
       }
       
       return null
@@ -325,15 +244,44 @@ export function TokenCard({ token }: TokenCardProps) {
     // 3. Pool data (fallback)
     if (availablePools.length > 0) {
       const pool = availablePools[0]
-      if (pool.token_a_symbol !== 'SOL') {
+      if (pool.token_a_mint === token.mint && pool.token_a_symbol !== 'SOL') {
         return pool.token_a_symbol
-      } else if (pool.token_b_symbol !== 'SOL') {
+      } else if (pool.token_b_mint === token.mint && pool.token_b_symbol !== 'SOL') {
         return pool.token_b_symbol
       }
     }
     
     // 4. Shortened mint address (final fallback)
     return `${token.mint.slice(0, 4)}...${token.mint.slice(-4)}`
+  }
+
+  // Get organic score quality indicator
+  const getOrganicScoreQuality = (score: number) => {
+    if (score >= 70) {
+      return {
+        label: 'High',
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/20',
+        borderColor: 'border-green-500/30',
+        icon: <TrendingUp className="w-3 h-3" />
+      }
+    } else if (score >= 40) {
+      return {
+        label: 'Medium',
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/20',
+        borderColor: 'border-blue-500/30',
+        icon: <Users className="w-3 h-3" />
+      }
+    } else {
+      return {
+        label: 'Low',
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/20',
+        borderColor: 'border-red-500/30',
+        icon: <AlertTriangle className="w-3 h-3" />
+      }
+    }
   }
 
   // Notification setup
@@ -466,7 +414,7 @@ export function TokenCard({ token }: TokenCardProps) {
         fetchJupiterTokenData(token.mint)
       ])
       
-      setTokenName(name || jupiterData?.symbol || null) // Use Jupiter symbol as fallback
+      setTokenName(name || jupiterData?.symbol || null)
       setPoolExists(exists)
       setJupiterTokenData(jupiterData)
       
@@ -552,7 +500,7 @@ export function TokenCard({ token }: TokenCardProps) {
   }
 
   const ageInSeconds = token.timestamp - token.tge_at
-  const formattedTime = ageInSeconds < 60 ? `${ageInSeconds}s` : `${Math.floor(ageInSeconds / 60)}m`
+  const formattedTime = formatTime(ageInSeconds)
 
   return (
     <motion.div

@@ -1,4 +1,3 @@
-// src/components/damm-v2/damm-v2-feature.tsx
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -15,7 +14,11 @@ export interface TokenData {
   total_jupiter: number
   jupiter_pct: number
   is_new_entry: boolean
-  since_tge: number
+  total_trade_size: number
+  delta_total_trade_size: number
+  delta_jupiter_trade_size: number
+  jupiter_trade_size: number
+  tge_at: number
   timestamp: number
 }
 
@@ -63,45 +66,90 @@ export default function DammV2Feature() {
     }
 
     let ws: WebSocket | null = null
+    let reconnectTimeout: NodeJS.Timeout | null = null
+    let reconnectAttempts = 0
+    const maxReconnectAttempts = 10
+    const baseReconnectDelay = 1000 // Start with 1 second
 
-    try {
-      ws = new WebSocket('wss://comet.lyt.wtf/ws')
-
-      ws.onopen = () => {
-        console.log('connected to websocket')
-        setWsConnected(true)
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const data: TokenData = JSON.parse(event.data)
-          addOrUpdateToken(data)
-
-          if (data.is_new_entry) {
-            setNewToken(data)
-            setPopupOpen(true)
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error)
+    const connectWebSocket = () => {
+      try {
+        if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+          return // Already connecting or connected
         }
-      }
 
-      ws.onclose = () => {
-        console.log('disconnected from websocket')
-        setWsConnected(false)
-      }
+        console.log('🔌 Connecting to WebSocket...')
+        ws = new WebSocket('wss://comet.lyt.wtf/ws')
 
-      ws.onerror = (error) => {
-        console.error('websocket error:', error)
+        ws.onopen = () => {
+          console.log('✅ WebSocket connected')
+          setWsConnected(true)
+          reconnectAttempts = 0 // Reset attempts on successful connection
+        }
+
+        ws.onmessage = (event) => {
+          try {
+            const data: TokenData = JSON.parse(event.data)
+            addOrUpdateToken(data)
+
+            if (data.is_new_entry) {
+              setNewToken(data)
+              setPopupOpen(true)
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error)
+          }
+        }
+
+        ws.onclose = (event) => {
+          console.log('🔌 WebSocket disconnected:', event.code, event.reason)
+          setWsConnected(false)
+          
+          // Don't reconnect if it was a clean close (code 1000) or if we've exceeded max attempts
+          if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+            scheduleReconnect()
+          } else if (reconnectAttempts >= maxReconnectAttempts) {
+            console.error('❌ Max reconnection attempts reached')
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error:', error)
+          setWsConnected(false)
+        }
+
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error)
         setWsConnected(false)
+        scheduleReconnect()
       }
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error)
     }
 
+    const scheduleReconnect = () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+      }
+
+      reconnectAttempts++
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
+      const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), 30000)
+      
+      console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`)
+      
+      reconnectTimeout = setTimeout(() => {
+        connectWebSocket()
+      }, delay)
+    }
+
+    // Initial connection
+    connectWebSocket()
+
+    // Cleanup function
     return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+      }
       if (ws) {
-        ws.close()
+        ws.close(1000, 'Component unmounting') // Clean close
       }
       // Fix ESLint warning by capturing the current value
       const currentTimers = expiryTimers.current
