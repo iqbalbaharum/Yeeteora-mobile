@@ -78,7 +78,7 @@ export default function DammV2Feature() {
         }
 
         console.log('🔌 Connecting to WebSocket...')
-        ws = new WebSocket('wss://comet.lyt.wtf/ws')
+        ws = new WebSocket('wss://comet.leyeetbot.com/ws')
 
         ws.onopen = () => {
           console.log('✅ WebSocket connected')
@@ -103,7 +103,7 @@ export default function DammV2Feature() {
         ws.onclose = (event) => {
           console.log('🔌 WebSocket disconnected:', event.code, event.reason)
           setWsConnected(false)
-          
+
           // Don't reconnect if it was a clean close (code 1000) or if we've exceeded max attempts
           if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
             scheduleReconnect()
@@ -116,7 +116,6 @@ export default function DammV2Feature() {
           console.error('❌ WebSocket error:', error)
           setWsConnected(false)
         }
-
       } catch (error) {
         console.error('Failed to create WebSocket connection:', error)
         setWsConnected(false)
@@ -132,9 +131,9 @@ export default function DammV2Feature() {
       reconnectAttempts++
       // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
       const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), 30000)
-      
+
       console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`)
-      
+
       reconnectTimeout = setTimeout(() => {
         connectWebSocket()
       }, delay)
@@ -172,9 +171,7 @@ export default function DammV2Feature() {
       <AppHero title="Alpha call Damm v2" subtitle="Next-generation Dynamic Automated Market Making strategies" />
       <div className="px-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          {isMounted && (
-            <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          )}
+          {isMounted && <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>}
           <span className="text-sm text-muted-foreground">
             {!isMounted ? 'Connecting...' : wsConnected ? 'Connected' : 'Disconnected'}
           </span>
@@ -194,9 +191,7 @@ export default function DammV2Feature() {
           </div>
         )}
       </div>
-      {isMounted && (
-        <NewTokenPopup token={newToken} open={isPopupOpen} onOpenChange={setPopupOpen} />
-      )}
+      {isMounted && <NewTokenPopup token={newToken} open={isPopupOpen} onOpenChange={setPopupOpen} />}
     </div>
   )
 }
